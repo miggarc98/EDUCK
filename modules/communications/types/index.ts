@@ -1,1 +1,0 @@
-// TypeScript interfaces for communications
