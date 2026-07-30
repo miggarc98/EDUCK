@@ -1,0 +1,55 @@
+# === Node.js / React (Frontend) ===
+# Dependencias
+/frontend/node_modules
+/.pnp
+.pnp.js
+
+# Archivos de logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Directorio de build (producción)
+/frontend/dist
+/frontend/build
+
+# Cache de Vite
+/frontend/.vite
+
+# Reportes de cobertura de tests
+/frontend/coverage
+
+# Archivos de entorno (contienen secretos y configuraciones locales)
+.env
+.env.local
+.env.*.local
+
+# Cache de ESLint
+.eslintcache
+
+
+# === Python / Django (Backend) ===
+# Byte-code o cache de Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Entornos virtuales
+.venv/
+venv/
+ENV/
+
+# Bases de datos locales
+*.sqlite3
+db.sqlite3
+
+
+# === General ===
+# Archivos de sistema operativo
+.DS_Store
+Thumbs.db
+
+# Archivos de configuración de IDEs
+.vscode/
+.idea/
