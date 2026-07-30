@@ -1,0 +1,40 @@
+// routes/index.tsx
+import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { MainLayout } from '@/layouts/MainLayout';
+import { AuthLayout } from '@/layouts/AuthLayout';
+import { LoginPage } from '@/features/auth_users/pages/LoginPage';
+
+// Componente temporal para dashboard
+const DashboardPage = () => (
+    <div className="p-8">
+        <h1 className="text-2xl font-bold">Dashboard</h1>
+        <p className="mt-4">Bienvenido a Educk</p>
+    </div>
+);
+
+export const router = createBrowserRouter([
+    {
+        path: '/',
+        element: <Navigate to="/dashboard" replace />,
+    },
+    {
+        path: '/auth',
+        element: <AuthLayout />,
+        children: [
+            {
+                path: 'login',
+                element: <LoginPage />,
+            },
+        ],
+    },
+    {
+        path: '/',
+        element: <MainLayout />,
+        children: [
+            {
+                path: 'dashboard',
+                element: <DashboardPage />,
+            },
+        ],
+    },
+]);
