@@ -8,6 +8,7 @@ import { useLogin } from '../hooks/useLogin';
 import { usePasswordRecovery } from '../hooks/usePasswordRecovery';
 import { LoadingOverlay } from '@/shared/components/molecules/LoadingOverlay';
 import { AuthView } from '../types';
+import { useNavigate } from 'react-router-dom';
 
 export const LoginLayout = () => {
     const [currentView, setCurrentView] = useState<AuthView>('login');
@@ -18,12 +19,13 @@ export const LoginLayout = () => {
 
     const isLoading = loginLoading || recoveryLoading;
 
+    const navigate = useNavigate();
+
     const handleLogin = async (credentials: { email: string; password: string }) => {
         const success = await login(credentials);
 
         if (success) {
-            // Redireccionar al dashboard o manejar la autenticación
-            // router.push('/dashboard');
+            navigate('/dashboard');
             console.log('Login exitoso');
         }
     };
