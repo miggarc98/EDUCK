@@ -19,8 +19,14 @@ export const authApi = {
     },
 
     logout: async (): Promise<void> => {
-        await apiClient.post('/auth/logout');
-        localStorage.removeItem('auth_token');
+        try {
+            await apiClient.post('/auth/logout');
+        } catch (error) {
+            console.error('Error al notificar cierre de sesión al servidor:', error);
+        } finally {
+            localStorage.clear();
+            sessionStorage.clear();
+        }
     },
 
     getCurrentUser: async (): Promise<User> => {
