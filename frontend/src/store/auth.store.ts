@@ -24,6 +24,9 @@ export const useAuthStore = create<AuthStore>()(
                 try {
                     const response = await authApi.login({ email, password });
                     localStorage.setItem('auth_token', response.token);
+                    if (response.refresh) {
+                        localStorage.setItem('refresh_token', response.refresh);
+                    }
                     set({
                         user: response.user,
                         isAuthenticated: true,
@@ -40,6 +43,9 @@ export const useAuthStore = create<AuthStore>()(
                 try {
                     const response = await authApi.register(data);
                     localStorage.setItem('auth_token', response.token);
+                    if (response.refresh) {
+                        localStorage.setItem('refresh_token', response.refresh);
+                    }
                     set({
                         user: response.user,
                         isAuthenticated: true,
@@ -58,9 +64,11 @@ export const useAuthStore = create<AuthStore>()(
                     console.error('Error al cerrar sesión:', error);
                 } finally {
                     localStorage.removeItem('auth_token');
+                    localStorage.removeItem('refresh_token');
                     set({ user: null, isAuthenticated: false, isLoading: false });
                 }
             },
+
 
             checkAuth: async () => {
                 const token = localStorage.getItem('auth_token');

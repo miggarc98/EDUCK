@@ -1,23 +1,33 @@
 // layouts/MainLayout.tsx
-import { Outlet } from 'react-router-dom';
+import { useState } from 'react';
+import { Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { Sidebar } from '@/shared/components/Sidebar';
+import { useLogout } from '@/features/auth_users/hooks/useLogout';
 
 export const MainLayout = () => {
+    const [isCollapsed, setIsCollapsed] = useState(false);
+    const navigate = useNavigate();
+    const location = useLocation();
+    const { logout } = useLogout();
+
+    // Determinar la vista actual basada en la ruta activa o por defecto 'dashboard'
+    const currentPath = location.pathname.substring(1) || 'dashboard';
+    const currentView = currentPath.split('/')[0];
+
+    const handleViewChange = (view: string) => {
+        navigate(`/${view}`);
+    };
+
     return (
-        <div className="min-h-screen bg-gray-50">
-            <nav className="bg-white shadow-sm">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex justify-between h-16">
-                        <div className="flex items-center">
-                            <h1 className="text-xl font-bold">Educk</h1>
-                        </div>
-                        <div className="flex items-center space-x-4">
-                            <button className="text-gray-700 hover:text-gray-900">Perfil</button>
-                            <button className="text-gray-700 hover:text-gray-900">Cerrar sesión</button>
-                        </div>
-                    </div>
-                </div>
-            </nav>
-            <main>
+        <div className="flex h-screen bg-slate-950 overflow-hidden">
+            <Sidebar
+                currentView={currentView}
+                setCurrentView={handleViewChange}
+                isCollapsed={isCollapsed}
+                toggleCollapse={() => setIsCollapsed((prev) => !prev)}
+                onLogout={logout}
+            />
+            <main className="flex-1 overflow-y-auto bg-slate-950 p-6">
                 <Outlet />
             </main>
         </div>

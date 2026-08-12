@@ -1,19 +1,16 @@
 import { useState } from 'react';
-import { authApi } from '../services/api';
+import { useAuthStore } from '@/store/auth.store';
 
 export const useLogout = () => {
     const [loading, setLoading] = useState(false);
+    const storeLogout = useAuthStore((state) => state.logout);
 
     const logout = async () => {
         setLoading(true);
         try {
-            await authApi.logout();
+            await storeLogout();
         } finally {
-            // Asegurar la limpieza inmediata de almacenamiento local y de sesión
-            localStorage.clear();
-            sessionStorage.clear();
             setLoading(false);
-            // Redireccionar al usuario a la página de login / inicio
             window.location.href = '/login';
         }
     };

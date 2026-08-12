@@ -8,42 +8,51 @@ import type {
 } from '../types';
 
 export const authApi = {
-    login: async (credentials: LoginCredentials): Promise<AuthResponse> => {
-        const response = await apiClient.post('/auth/login', credentials);
-        return response.data;
+    login: async (credentials: LoginCredentials): Promise<AuthResponse & { refresh?: string }> => {
+        const response = await apiClient.post('/auth/login/', credentials);
+        return {
+            token: response.data.access,
+            refresh: response.data.refresh,
+            user: response.data.user
+        };
     },
 
-    register: async (data: RegisterData): Promise<AuthResponse> => {
-        const response = await apiClient.post('/auth/register', data);
-        return response.data;
+    register: async (data: RegisterData): Promise<AuthResponse & { refresh?: string }> => {
+        const response = await apiClient.post('/auth/register/', data);
+        return {
+            token: response.data.access,
+            refresh: response.data.refresh,
+            user: response.data.user
+        };
     },
 
     logout: async (): Promise<void> => {
         try {
-            await apiClient.post('/auth/logout');
-        } catch (error) {
-            console.error('Error al notificar cierre de sesión al servidor:', error);
-        } finally {
             localStorage.clear();
             sessionStorage.clear();
+        } catch (error) {
+            console.error('Error al cerrar sesión:', error);
         }
     },
 
     getCurrentUser: async (): Promise<User> => {
-        const response = await apiClient.get('/auth/me');
+        const response = await apiClient.get('/auth/profile/');
         return response.data;
     },
 
     refreshToken: async (): Promise<{ token: string }> => {
-        const response = await apiClient.post('/auth/refresh');
-        return response.data;
+        const refresh = localStorage.getItem('refresh_token');
+        const response = await apiClient.post('/auth/token/refresh/', { refresh });
+        return {
+            token: response.data.access
+        };
     },
 
     forgotPassword: async (email: string): Promise<void> => {
-        await apiClient.post('/auth/forgot-password', { email });
+        await apiClient.post('/auth/forgot-password/', { email });
     },
 
     resetPassword: async (token: string, newPassword: string): Promise<void> => {
-        await apiClient.post('/auth/reset-password', { token, newPassword });
+        await apiClient.post('/auth/reset-password/', { token, newPassword });
     },
 };

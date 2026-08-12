@@ -1,3 +1,32 @@
+export interface User {
+    id: number;
+    email: string;
+    first_name: string;
+    last_name: string;
+    role: 'coordinator' | 'teacher' | 'student' | 'parent';
+    is_active?: boolean;
+}
+
+export interface AuthState {
+    user: User | null;
+    isAuthenticated: boolean;
+    isLoading: boolean;
+}
+
+export interface AuthResponse {
+    token: string;
+    user: User;
+}
+
+export interface RegisterData {
+    email: string;
+    password?: string;
+    first_name?: string;
+    last_name?: string;
+    role?: string;
+    [key: string]: any;
+}
+
 export interface LoginCredentials {
     email: string;
     password: string;
