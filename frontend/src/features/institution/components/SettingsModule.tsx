@@ -1,5 +1,7 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { institutionApi } from "../services/api";
+import { useAuthStore } from "@/store/auth.store";
+import { AuditLogViewer } from "@/shared/components/AuditLogViewer";
 import {
   Building2,
   UserCircle,
@@ -19,6 +21,12 @@ import {
   Key,
   X,
   AlertCircle,
+  Edit3,
+  Plus,
+  Search,
+  CheckSquare,
+  Square,
+  Info,
 } from "lucide-react";
 
 interface GradeItem {
@@ -46,8 +54,77 @@ interface RoleItem {
   permissions: string[];
 }
 
+interface PermissionItem {
+  id: string;
+  name: string;
+  description: string;
+}
+
+interface PermissionCategory {
+  category: string;
+  icon: any;
+  permissions: PermissionItem[];
+}
+
+const PERMISSION_CATALOG: PermissionCategory[] = [
+  {
+    category: "Académico y Evaluación",
+    icon: GraduationCap,
+    permissions: [
+      { id: "ingreso_notas", name: "Ingreso de Notas", description: "Registro y modificación de calificaciones por periodo." },
+      { id: "planillas", name: "Planillas de Calificaciones", description: "Visualización e impresión de planillas docentes." },
+      { id: "aprobacion_logros", name: "Aprobación de Logros", description: "Definición y validación de logros pedagógicos." },
+      { id: "horario_escolar", name: "Horario Escolar", description: "Consulta e impresión de horarios por curso." },
+      { id: "observador", name: "Observador del Estudiante", description: "Registro de anotaciones pedagógicas y conducta." },
+      { id: "material_didactico", name: "Material Didáctico", description: "Subida y compartición de guías y contenidos." },
+      { id: "descarga_boletines", name: "Descarga de Boletines", description: "Generación de reportes de boletines por periodo." },
+      { id: "asistencia_diaria", name: "Asistencia Diaria", description: "Toma y control de asistencia a clases." },
+      { id: "consulta_calificaciones", name: "Consulta de Calificaciones", description: "Acceso en solo lectura a notas registradas." },
+    ],
+  },
+  {
+    category: "Convivencia y Disciplina",
+    icon: Shield,
+    permissions: [
+      { id: "gestion_convivencial", name: "Gestión Convivencial", description: "Registro y seguimiento de faltas leves y graves." },
+      { id: "citacion_acudientes", name: "Citación a Acudientes", description: "Emisión de citaciones oficiales a padres de familia." },
+      { id: "alertas_convivenciales", name: "Alertas Convivenciales", description: "Recepción de alertas automáticas disciplinarias." },
+      { id: "atencion_padres", name: "Atención a Padres", description: "Gestión de agenda y compromisos con acudientes." },
+    ],
+  },
+  {
+    category: "Administración y Usuarios",
+    icon: Users,
+    permissions: [
+      { id: "gestion_institucional", name: "Gestión Institucional", description: "Modificación de datos e identidad del colegio." },
+      { id: "creacion_usuarios", name: "Creación de Usuarios", description: "Alta, edición y desactivación de perfiles de usuario." },
+      { id: "asignacion_roles", name: "Asignación de Roles", description: "Configuración de perfiles y permisos de acceso." },
+      { id: "matricula_estudiantes", name: "Matrícula de Estudiantes", description: "Inscripción de alumnos en cursos y grados." },
+      { id: "reportes_academicos", name: "Reportes Académicos", description: "Estadísticas consolidadas de rendimiento." },
+    ],
+  },
+  {
+    category: "Seguridad y Auditoría",
+    icon: Lock,
+    permissions: [
+      { id: "configuracion_global", name: "Configuración Global", description: "Parámetros avanzados de la plataforma." },
+      { id: "gestion_licencias", name: "Gestión de Licencias", description: "Control del estado de suscripción del colegio." },
+      { id: "auditoria_logs", name: "Auditoría de Logs", description: "Trazabilidad de acciones e inicios de sesión." },
+    ],
+  },
+  {
+    category: "Comunicación y Finanzas",
+    icon: Bell,
+    permissions: [
+      { id: "mensajeria_institucional", name: "Mensajería Institucional", description: "Envío de circulares y comunicados masivos." },
+      { id: "pagos_certificados", name: "Pagos y Certificados", description: "Generación de certificados de estudio y paz y salvos." },
+      { id: "seguimiento_academico", name: "Seguimiento Académico", description: "Portal para acudientes sobre avance del estudiante." },
+    ],
+  },
+];
+
 export function SettingsModule() {
-  const [activeTab, setActiveTab] = useState<"institution" | "account">(
+  const [activeTab, setActiveTab] = useState<"institution" | "account" | "history">(
     "institution"
   );
   const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(null);
@@ -124,27 +201,22 @@ export function SettingsModule() {
     },
   ]);
 
-  // Roles in Institution
-  const rolesList: RoleItem[] = [
-    {
-      id: "superadmin",
-      name: "Superadministrador",
-      color: "purple",
-      badgeBg: "bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800",
-      badgeText: "Acceso Total",
-      usersCount: 2,
-      description: "Acceso global del sistema, gestión multi-sede y soporte avanzado.",
-      permissions: ["Configuración Global", "Gestión de Licencias", "Auditoría de Logs", "Gestión de Usuarios"],
-    },
+  // Permisos consolidados de todo el catálogo
+  const ALL_CATALOG_PERMISSIONS = PERMISSION_CATALOG.flatMap((c) =>
+    c.permissions.map((p) => p.name)
+  );
+
+  // Roles predefinidos en la Institución (Superadministrador oculto según regla de negocio)
+  const defaultRolesList: RoleItem[] = [
     {
       id: "admin",
       name: "Administrador Institucional",
       color: "blue",
       badgeBg: "bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800",
-      badgeText: "Gestión Sede",
+      badgeText: "Acceso Total",
       usersCount: 5,
       description: "Administración completa de la sede, asignación de roles y matrículas.",
-      permissions: ["Gestión Institucional", "Creación de Usuarios", "Asignación de Horarios", "Reportes Académicos"],
+      permissions: ALL_CATALOG_PERMISSIONS,
     },
     {
       id: "coordinator",
@@ -154,7 +226,7 @@ export function SettingsModule() {
       badgeText: "Supervisión",
       usersCount: 8,
       description: "Supervisión docente, seguimiento disciplinario y cierre de periodos.",
-      permissions: ["Gestión Convivencial", "Aprobación de Logros", "Citación a Acudientes", "Planillas de Calificaciones"],
+      permissions: ["Gestión Convivencial", "Aprobación de Logros", "Citación a Acudientes", "Planillas de Calificaciones", "Observador del Estudiante", "Reportes Académicos"],
     },
     {
       id: "teacher",
@@ -164,7 +236,7 @@ export function SettingsModule() {
       badgeText: "Aula y Notas",
       usersCount: 42,
       description: "Registro de asistencia, ingreso de notas por periodo y observaciones.",
-      permissions: ["Ingreso de Notas", "Asistencia Diaria", "Observador del Estudiante", "Material Didáctico"],
+      permissions: ["Ingreso de Notas", "Asistencia Diaria", "Observador del Estudiante", "Material Didáctico", "Planillas de Calificaciones"],
     },
     {
       id: "student",
@@ -174,7 +246,7 @@ export function SettingsModule() {
       badgeText: "Consulta",
       usersCount: 680,
       description: "Consulta de boletines, horario de clases y recepción de comunicados.",
-      permissions: ["Consulta de Calificaciones", "Horario Escolar", "Mensajería Institucional", "Descarga de Boletines"],
+      permissions: ["Consulta de Calificaciones", "Horario Escolar", "Mensajería Institucional", "Descarga de Boletines", "Material Didáctico"],
     },
     {
       id: "parent",
@@ -184,9 +256,69 @@ export function SettingsModule() {
       badgeText: "Seguimiento",
       usersCount: 520,
       description: "Seguimiento al desempeño de sus acudidos y canales de comunicación.",
-      permissions: ["Seguimiento Académico", "Alertas Convivenciales", "Pagos y Certificados", "Atención a Padres"],
+      permissions: ["Seguimiento Académico", "Alertas Convivenciales", "Pagos y Certificados", "Atención a Padres", "Descarga de Boletines"],
     },
   ];
+
+  // Estado dinámico de roles y permisos
+  const [roles, setRoles] = useState<RoleItem[]>(defaultRolesList);
+  const [editingRoleId, setEditingRoleId] = useState<string | null>(null);
+  const [isPermissionModalOpen, setIsPermissionModalOpen] = useState(false);
+  const [permissionSearch, setPermissionSearch] = useState("");
+  const [customPermissionName, setCustomPermissionName] = useState("");
+
+  const activeEditingRole = roles.find((r) => r.id === editingRoleId) || roles[0];
+
+  // Alternar un permiso específico para un rol (Administrador no editable)
+  const togglePermission = (roleId: string, permName: string) => {
+    if (roleId === "admin") return;
+    setRoles((prevRoles) =>
+      prevRoles.map((role) => {
+        if (role.id !== roleId) return role;
+        const hasPerm = role.permissions.includes(permName);
+        return {
+          ...role,
+          permissions: hasPerm
+            ? role.permissions.filter((p) => p !== permName)
+            : [...role.permissions, permName],
+        };
+      })
+    );
+  };
+
+  // Alternar todos los permisos de una categoría (Administrador no editable)
+  const toggleCategoryPermissions = (roleId: string, categoryPerms: string[]) => {
+    if (roleId === "admin") return;
+    setRoles((prevRoles) =>
+      prevRoles.map((role) => {
+        if (role.id !== roleId) return role;
+        const allSelected = categoryPerms.every((p) => role.permissions.includes(p));
+        let newPermissions: string[];
+        if (allSelected) {
+          newPermissions = role.permissions.filter((p) => !categoryPerms.includes(p));
+        } else {
+          const toAdd = categoryPerms.filter((p) => !role.permissions.includes(p));
+          newPermissions = [...role.permissions, ...toAdd];
+        }
+        return { ...role, permissions: newPermissions };
+      })
+    );
+  };
+
+  // Agregar permiso personalizado a un rol (Administrador no editable)
+  const addCustomPermission = (roleId: string) => {
+    if (roleId === "admin") return;
+    const name = customPermissionName.trim();
+    if (!name) return;
+    setRoles((prevRoles) =>
+      prevRoles.map((role) => {
+        if (role.id !== roleId) return role;
+        if (role.permissions.includes(name)) return role;
+        return { ...role, permissions: [...role.permissions, name] };
+      })
+    );
+    setCustomPermissionName("");
+  };
 
   // User Account Details
   const [firstName, setFirstName] = useState("Admin");
@@ -220,37 +352,104 @@ export function SettingsModule() {
     }
   };
 
+  const { user } = useAuthStore();
   const [isSaving, setIsSaving] = useState(false);
 
-  // Cargar configuración desde el backend al montar el componente
+  // Sincronizar datos del usuario autenticado
   useEffect(() => {
-    const loadSettings = async () => {
-      try {
-        const data = await institutionApi.getSettings();
-        if (data) {
-          if (data.name) setInstitutionName(data.name);
-          if (data.dane_nit) setDaneNit(data.dane_nit);
-          if (data.address) setAddress(data.address);
-          if (data.phone) setPhone(data.phone);
-          if (data.email) setEmail(data.email);
-          if (data.logo_url) setLogoPreview(data.logo_url);
-          if (data.academic_year) setAcademicYear(String(data.academic_year));
-          if (data.active_period) setCurrentPeriod(data.active_period);
-          if (data.start_time) setStartTime(data.start_time);
-          if (data.end_time) setEndTime(data.end_time);
-          if (data.block_duration_minutes) setClassDuration(`${data.block_duration_minutes} min`);
-          if (data.decimal_precision) setDecimalPrecision(String(data.decimal_precision) as "1" | "2");
-          if (data.min_passing_grade) setMinPassingGrade(String(data.min_passing_grade));
-          if (typeof data.independent_scale_per_level === "boolean") {
-            setIndependentScaleByCourse(data.independent_scale_per_level);
-          }
+    if (user) {
+      if (user.first_name) setFirstName(user.first_name);
+      if (user.last_name) setLastName(user.last_name);
+      if (user.email) setUserEmail(user.email);
+      if (typeof user.two_factor_enabled === "boolean") setTwoFactorEnabled(user.two_factor_enabled);
+    }
+  }, [user]);
+
+  // Cargar configuración desde el backend al montar el componente
+  const loadSettings = useCallback(async () => {
+    try {
+      const data = await institutionApi.getSettings();
+      if (data) {
+        if (data.name) setInstitutionName(data.name);
+        if (data.dane_nit) setDaneNit(data.dane_nit);
+        if (data.address) setAddress(data.address);
+        if (data.phone) setPhone(data.phone);
+        if (data.email) setEmail(data.email);
+        if (data.logo_url) setLogoPreview(data.logo_url);
+        if (data.academic_year) setAcademicYear(String(data.academic_year));
+        if (data.active_period) setCurrentPeriod(data.active_period);
+        if (data.start_time) setStartTime(data.start_time);
+        if (data.end_time) setEndTime(data.end_time);
+        if (data.block_duration_minutes) setClassDuration(`${data.block_duration_minutes} min`);
+
+        if (data.general_scale) {
+          const s = data.general_scale;
+          if (s === "numeric_1_5" || s.includes("1.0")) setGeneralScale("numeric_1_5");
+          else if (s === "numeric_0_100" || s.includes("0-100") || s.includes("100")) setGeneralScale("numeric_0_100");
+          else if (s === "qualitative" || s.includes("Cualitativa")) setGeneralScale("qualitative");
+          else if (s === "national_col" || s.includes("Nacional")) setGeneralScale("national_col");
         }
-      } catch (err) {
-        // En caso de que no exista backend activo aún, se mantienen valores predeterminados para la interfaz
+
+        if (data.decimal_precision) setDecimalPrecision(String(data.decimal_precision) as "1" | "2");
+        if (data.min_passing_grade) setMinPassingGrade(String(data.min_passing_grade));
+        if (typeof data.independent_scale_per_level === "boolean") {
+          setIndependentScaleByCourse(data.independent_scale_per_level);
+        }
+
+        if (data.level_scales || data.offered_degrees) {
+          setLevelGroups((prev) =>
+            prev.map((group) => {
+              const newScale = data.level_scales?.[group.levelId] || group.gradingScale;
+              const enabledDegrees = data.offered_degrees?.[group.levelId];
+              let newGrades = group.grades;
+              if (enabledDegrees && Array.isArray(enabledDegrees)) {
+                newGrades = group.grades.map((grade) => {
+                  const isEnabled = enabledDegrees.some(
+                    (degName: string) =>
+                      degName.toLowerCase().includes(grade.name.toLowerCase()) ||
+                      grade.name.toLowerCase().includes(degName.toLowerCase()) ||
+                      degName === grade.id
+                  );
+                  return { ...grade, enabled: isEnabled };
+                });
+              }
+              return {
+                ...group,
+                gradingScale: newScale,
+                grades: newGrades,
+              };
+            })
+          );
+        }
+
+        if (data.settings_json?.notifications) {
+          setNotifications({
+            discipline: !!data.settings_json.notifications.behavior_alerts,
+            system: !!data.settings_json.notifications.system_notices,
+            weeklyReport: !!data.settings_json.notifications.weekly_report,
+          });
+        }
+
+        if (data.settings_json?.roles_permissions) {
+          const savedRolesPerms = data.settings_json.roles_permissions;
+          setRoles((prevRoles) =>
+            prevRoles.map((role) => {
+              if (savedRolesPerms[role.id] && Array.isArray(savedRolesPerms[role.id])) {
+                return { ...role, permissions: savedRolesPerms[role.id] };
+              }
+              return role;
+            })
+          );
+        }
       }
-    };
-    loadSettings();
+    } catch (err) {
+      console.error("Error al cargar la configuración de la institución:", err);
+    }
   }, []);
+
+  useEffect(() => {
+    loadSettings();
+  }, [loadSettings]);
 
   // Toggle Grade Active state
   const toggleGrade = (levelId: string, gradeId: string) => {
@@ -281,6 +480,11 @@ export function SettingsModule() {
   // Save changes handler
   const handleSave = async (sectionName: string) => {
     setIsSaving(true);
+    const rolesPermissionsMap: Record<string, string[]> = {};
+    roles.forEach((r) => {
+      rolesPermissionsMap[r.id] = r.permissions;
+    });
+
     try {
       await institutionApi.updateSettings({
         name: institutionName,
@@ -309,6 +513,7 @@ export function SettingsModule() {
             system_notices: notifications.system,
             weekly_report: notifications.weeklyReport,
           },
+          roles_permissions: rolesPermissionsMap,
         },
       });
       setSaveSuccessMessage(`¡Configuración de ${sectionName} guardada exitosamente en el servidor!`);
@@ -397,6 +602,17 @@ export function SettingsModule() {
             >
               <UserCircle className="w-5 h-5 shrink-0" />
               <span>Cuenta y Perfil</span>
+            </button>
+            <button
+              onClick={() => setActiveTab("history")}
+              className={`flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-medium transition-all whitespace-nowrap ${
+                activeTab === "history"
+                  ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
+                  : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60"
+              }`}
+            >
+              <Clock className="w-5 h-5 shrink-0" />
+              <span>Historial y Trazabilidad</span>
             </button>
           </nav>
         </div>
@@ -874,44 +1090,93 @@ export function SettingsModule() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {rolesList.map((role) => (
-                    <div
-                      key={role.id}
-                      className="p-4 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50/50 dark:bg-slate-800/40 hover:border-blue-300 dark:hover:border-blue-800 transition-all space-y-3"
-                    >
-                      <div className="flex items-start justify-between">
+                  {roles.map((role) => {
+                    const isAdmin = role.id === "admin";
+                    return (
+                      <div
+                        key={role.id}
+                        className="p-4 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50/50 dark:bg-slate-800/40 hover:border-blue-300 dark:hover:border-blue-800 transition-all flex flex-col justify-between space-y-3"
+                      >
                         <div>
-                          <span
-                            className={`inline-block px-2.5 py-1 rounded-md text-xs font-bold border ${role.badgeBg}`}
-                          >
-                            {role.name}
-                          </span>
-                          <p className="text-xs text-slate-600 dark:text-slate-300 mt-2">
-                            {role.description}
-                          </p>
-                        </div>
-                        <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 shrink-0 ml-2">
-                          {role.usersCount} usuarios
-                        </span>
-                      </div>
-
-                      <div className="pt-2 border-t border-slate-200/60 dark:border-slate-700/60">
-                        <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 block mb-1.5">
-                          Permisos Clave:
-                        </span>
-                        <div className="flex flex-wrap gap-1.5">
-                          {role.permissions.map((perm, idx) => (
-                            <span
-                              key={idx}
-                              className="text-[10px] px-2 py-0.5 rounded-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400"
-                            >
-                              {perm}
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <span
+                                className={`inline-block px-2.5 py-1 rounded-md text-xs font-bold border ${role.badgeBg}`}
+                              >
+                                {role.name}
+                              </span>
+                              <p className="text-xs text-slate-600 dark:text-slate-300 mt-2">
+                                {role.description}
+                              </p>
+                            </div>
+                            <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 shrink-0 ml-2">
+                              {role.usersCount} usuarios
                             </span>
-                          ))}
+                          </div>
+
+                          <div className="pt-3 mt-3 border-t border-slate-200/60 dark:border-slate-700/60">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                                {isAdmin
+                                  ? "Permisos Institucionales (Acceso Total):"
+                                  : `Permisos Asignados (${role.permissions.length}):`}
+                              </span>
+                            </div>
+                            <div className="flex flex-wrap gap-1.5">
+                              {isAdmin ? (
+                                <span className="text-[10px] px-2.5 py-1 rounded-md bg-blue-100 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 font-bold flex items-center gap-1">
+                                  <Lock className="w-3 h-3" /> Acceso Global e Irrestricto a la Sede
+                                </span>
+                              ) : (
+                                <>
+                                  {role.permissions.slice(0, 5).map((perm, idx) => (
+                                    <span
+                                      key={idx}
+                                      className="text-[10px] px-2 py-0.5 rounded-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 font-medium"
+                                    >
+                                      {perm}
+                                    </span>
+                                  ))}
+                                  {role.permissions.length > 5 && (
+                                    <span className="text-[10px] px-2 py-0.5 rounded-md bg-purple-100 dark:bg-purple-900/40 border border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 font-bold">
+                                      +{role.permissions.length - 5} más
+                                    </span>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="pt-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingRoleId(role.id);
+                              setIsPermissionModalOpen(true);
+                            }}
+                            className={`w-full flex items-center justify-center gap-2 px-3 py-2 border text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
+                              isAdmin
+                                ? "bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700"
+                                : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200"
+                            }`}
+                          >
+                            {isAdmin ? (
+                              <>
+                                <Lock className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                                Ver Permisos (Acceso Total Integrado)
+                              </>
+                            ) : (
+                              <>
+                                <Edit3 className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                                Administrar Permisos ({role.permissions.length})
+                              </>
+                            )}
+                          </button>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </section>
 
@@ -1225,8 +1490,321 @@ export function SettingsModule() {
               </div>
             </>
           )}
+
+          {/* TAB 3: HISTORIAL Y TRAZABILIDAD */}
+          {activeTab === "history" && (
+            <AuditLogViewer
+              module="institution"
+              title="Historial de Configuraciones e Inmutabilidad"
+              subtitle="Registro inalterable de quién configuró o ajustó los datos institucionales, fecha, IP y opción de restauración"
+              onRestoreSuccess={loadSettings}
+            />
+          )}
         </div>
       </div>
+
+      {/* Modal de Administración de Permisos por Rol */}
+      {isPermissionModalOpen && activeEditingRole && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Header del Modal */}
+            <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/70 dark:bg-slate-800/40">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-400 rounded-2xl">
+                  <Shield className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">
+                      Administrar Permisos del Rol
+                    </h2>
+                    <select
+                      value={activeEditingRole.id}
+                      onChange={(e) => setEditingRoleId(e.target.value)}
+                      className="px-3 py-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
+                    >
+                      {roles.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.name} ({r.permissions.length} permisos)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    {activeEditingRole.description}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsPermissionModalOpen(false)}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Barra de Filtro / Búsqueda */}
+            <div className="p-4 bg-slate-50/50 dark:bg-slate-800/20 border-b border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row gap-3 items-center justify-between">
+              <div className="relative w-full sm:w-80">
+                <Search className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar permiso o función..."
+                  value={permissionSearch}
+                  onChange={(e) => setPermissionSearch(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-purple-500/20 text-slate-800 dark:text-slate-100"
+                />
+                {permissionSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setPermissionSearch("")}
+                    className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 text-xs"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2 self-end sm:self-auto">
+                <span className="text-xs font-semibold px-3 py-1 rounded-full bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300">
+                  {activeEditingRole.permissions.length} Permisos Seleccionados
+                </span>
+              </div>
+            </div>
+
+            {/* Lista de Categorías y Permisos (Scrollable) */}
+            <div className="p-6 overflow-y-auto space-y-6 flex-1">
+              {activeEditingRole.id === "admin" && (
+                <div className="p-4 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-2xl flex items-center gap-3 text-xs text-blue-800 dark:text-blue-200">
+                  <Lock className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0" />
+                  <div>
+                    <strong className="font-bold block text-sm mb-0.5">Rol Principal con Acceso Total Integrado</strong>
+                    El Administrador Institucional cuenta con acceso total e irrestricto a todas las funciones y módulos del sistema. Por seguridad institucional, sus permisos son globales y no pueden ser restringidos.
+                  </div>
+                </div>
+              )}
+
+              {PERMISSION_CATALOG.map((cat) => {
+                const CategoryIcon = cat.icon;
+                const filteredPerms = cat.permissions.filter(
+                  (p) =>
+                    p.name.toLowerCase().includes(permissionSearch.toLowerCase()) ||
+                    p.description.toLowerCase().includes(permissionSearch.toLowerCase())
+                );
+
+                if (permissionSearch && filteredPerms.length === 0) return null;
+
+                const categoryPermNames = cat.permissions.map((p) => p.name);
+                const allSelected = categoryPermNames.every((name) =>
+                  activeEditingRole.permissions.includes(name)
+                );
+                const countSelected = categoryPermNames.filter((name) =>
+                  activeEditingRole.permissions.includes(name)
+                ).length;
+
+                return (
+                  <div
+                    key={cat.category}
+                    className="p-5 border border-slate-200 dark:border-slate-800 rounded-2xl bg-slate-50/40 dark:bg-slate-800/30 space-y-4"
+                  >
+                    {/* Header de Categoría */}
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-200/60 dark:border-slate-700/60">
+                      <div className="flex items-center gap-2.5">
+                        <div className="p-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-purple-600 dark:text-purple-400">
+                          <CategoryIcon className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                            {cat.category}
+                          </h3>
+                          <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                            {countSelected} de {cat.permissions.length} activos
+                          </span>
+                        </div>
+                      </div>
+
+                      {activeEditingRole.id !== "admin" && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            toggleCategoryPermissions(activeEditingRole.id, categoryPermNames)
+                          }
+                          className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors flex items-center gap-1.5 cursor-pointer"
+                        >
+                          {allSelected ? (
+                            <>
+                              <Square className="w-3.5 h-3.5 text-slate-400" />
+                              Desmarcar Grupo
+                            </>
+                          ) : (
+                            <>
+                              <CheckSquare className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                              Marcar Todos
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Grid de Permisos */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {filteredPerms.map((perm) => {
+                        const isChecked = activeEditingRole.permissions.includes(perm.name);
+                        const isReadOnlyAdmin = activeEditingRole.id === "admin";
+                        return (
+                          <div
+                            key={perm.id}
+                            onClick={() =>
+                              !isReadOnlyAdmin && togglePermission(activeEditingRole.id, perm.name)
+                            }
+                            className={`p-3 rounded-xl border transition-all flex items-start gap-3 select-none ${
+                              isReadOnlyAdmin
+                                ? "bg-slate-100/80 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 opacity-90 cursor-default"
+                                : isChecked
+                                ? "bg-purple-50/70 dark:bg-purple-950/30 border-purple-300 dark:border-purple-800 shadow-xs cursor-pointer"
+                                : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 cursor-pointer"
+                            }`}
+                          >
+                            <div className="mt-0.5">
+                              <div
+                                className={`w-4 h-4 rounded flex items-center justify-center border transition-all ${
+                                  isChecked
+                                    ? "bg-purple-600 border-purple-600 text-white"
+                                    : "border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800"
+                                }`}
+                              >
+                                {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
+                              </div>
+                            </div>
+                            <div className="flex-1">
+                              <span
+                                className={`text-xs font-semibold block ${
+                                  isChecked
+                                    ? "text-purple-900 dark:text-purple-200"
+                                    : "text-slate-800 dark:text-slate-200"
+                                }`}
+                              >
+                                {perm.name}
+                              </span>
+                              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+                                {perm.description}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Permisos Personalizados Adicionales */}
+              {activeEditingRole.id !== "admin" && (
+                <div className="p-5 border border-slate-200 dark:border-slate-800 rounded-2xl bg-slate-50/40 dark:bg-slate-800/30 space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Plus className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                    <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                      Agregar Permiso Personalizado
+                    </h3>
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Crea permisos a medida para necesidades específicas de tu institución.
+                  </p>
+
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Ej. Firma de Libros de Grado..."
+                      value={customPermissionName}
+                      onChange={(e) => setCustomPermissionName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          addCustomPermission(activeEditingRole.id);
+                        }
+                      }}
+                      className="flex-1 px-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-purple-500/20 text-slate-800 dark:text-slate-100"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => addCustomPermission(activeEditingRole.id)}
+                      className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Agregar
+                    </button>
+                  </div>
+
+                {/* Lista de permisos de este rol que son personalizados */}
+                {(() => {
+                  const catalogNames = PERMISSION_CATALOG.flatMap((c) =>
+                    c.permissions.map((p) => p.name)
+                  );
+                  const customPerms = activeEditingRole.permissions.filter(
+                    (p) => !catalogNames.includes(p)
+                  );
+                  if (customPerms.length === 0) return null;
+
+                  return (
+                    <div className="pt-3 border-t border-slate-200 dark:border-slate-700/60">
+                      <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-2">
+                        Permisos Personalizados Activos:
+                      </span>
+                      <div className="flex flex-wrap gap-2">
+                        {customPerms.map((perm) => (
+                          <span
+                            key={perm}
+                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 text-xs font-medium"
+                          >
+                            {perm}
+                            <button
+                              type="button"
+                              onClick={() => togglePermission(activeEditingRole.id, perm)}
+                              className="hover:text-rose-600 transition-colors cursor-pointer"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+              )}
+            </div>
+
+            {/* Footer del Modal */}
+            <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                <Info className="w-4 h-4 text-purple-500 shrink-0" />
+                <span>Recuerda guardar la configuración institucional al finalizar.</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsPermissionModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsPermissionModalOpen(false);
+                    handleSave("Permisos de Roles");
+                  }}
+                  className="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-semibold transition-all shadow-md shadow-purple-500/20 active:scale-95 cursor-pointer flex items-center gap-2"
+                >
+                  <Save className="w-4 h-4" />
+                  Aplicar y Guardar Permisos
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

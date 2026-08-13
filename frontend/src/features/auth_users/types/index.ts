@@ -5,6 +5,7 @@ export interface User {
     last_name: string;
     role: 'superadmin' | 'admin' | 'coordinator' | 'teacher' | 'student' | 'parent';
     is_active?: boolean;
+    two_factor_enabled?: boolean;
 }
 
 export interface AuthState {

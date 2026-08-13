@@ -45,6 +45,7 @@ export interface InstitutionSettingData {
   offered_degrees: OfferedDegrees;
   settings_json?: {
     notifications?: InstitutionNotificationSettings;
+    roles_permissions?: Record<string, string[]>;
     [key: string]: any;
   };
 

@@ -3,6 +3,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from apps.institution.models import InstitutionSetting
 from apps.institution.api.serializers import InstitutionSettingSerializer
+from apps.core.services.audit_service import AuditLogService
 
 class IsAdminOrSuperAdminOrReadOnly(permissions.BasePermission):
     """
@@ -36,8 +37,17 @@ class InstitutionSettingView(APIView):
 
     def _update_settings(self, request, partial=False):
         setting = InstitutionSetting.get_solo()
+        old_snapshot = AuditLogService.serialize_instance(setting)
         serializer = InstitutionSettingSerializer(setting, data=request.data, partial=partial)
         if serializer.is_valid():
-            serializer.save()
+            updated_setting = serializer.save()
+            AuditLogService.log_change(
+                instance=updated_setting,
+                request=request,
+                action_type='UPDATE',
+                old_snapshot=old_snapshot,
+                module='institution',
+                entity_name=f"Configuración de {updated_setting.name}"
+            )
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
