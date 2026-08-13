@@ -55,6 +55,7 @@ AUTH_USER_MODEL = 'auth_users.User'
 MIDDLEWARE = [
     'django_tenants.middleware.main.TenantMainMiddleware',
     'corsheaders.middleware.CorsMiddleware',
+    'apps.core.middleware.PayloadEncryptionMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -63,6 +64,9 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+ENCRYPTION_KEY = os.environ.get('ENCRYPTION_KEY', 'default-super-secret-key-32chars!')
+
 
 ROOT_URLCONF = 'config.urls'
 
