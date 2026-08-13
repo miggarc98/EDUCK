@@ -46,14 +46,13 @@ export function Sidebar({
 
   return (
     <aside
-      className={`h-screen bg-slate-900 text-slate-300 flex flex-col border-r border-slate-800 relative transition-all duration-300 ${
-        isCollapsed ? "w-20" : "w-64"
-      }`}
+      className={`h-screen bg-slate-900 text-slate-300 flex flex-col border-r border-slate-800 relative transition-all duration-300 ${isCollapsed ? "w-20" : "w-64"
+        }`}
     >
       {toggleCollapse && (
         <button
           onClick={toggleCollapse}
-          className="absolute -right-3 top-8 bg-slate-800 text-slate-300 rounded-full p-1 border border-slate-700 hover:bg-slate-700 hidden md:flex z-10"
+          className="absolute -right-3 top-8 bg-slate-800 text-slate-300 rounded-full p-1 border border-slate-700 hover:bg-slate-700 z-20 hidden md:flex "
         >
           {isCollapsed ? (
             <ChevronRight className="w-4 h-4" />
@@ -99,11 +98,10 @@ export function Sidebar({
           <button
             key={item.id}
             onClick={() => setCurrentView(item.id)}
-            className={`w-full flex items-center rounded-lg transition-colors ${isCollapsed ? "justify-center p-3" : "gap-3 px-3 py-2.5"} ${
-              currentView === item.id
-                ? "bg-blue-600 text-white shadow-sm"
-                : "hover:bg-slate-800 hover:text-white"
-            }`}
+            className={`w-full flex items-center rounded-lg transition-colors ${isCollapsed ? "justify-center p-3" : "gap-3 px-3 py-2.5"} ${currentView === item.id
+              ? "bg-blue-600 text-white shadow-sm"
+              : "hover:bg-slate-800 hover:text-white"
+              }`}
             title={isCollapsed ? item.label : undefined}
           >
             <item.icon className={isCollapsed ? "w-6 h-6" : "w-5 h-5"} />

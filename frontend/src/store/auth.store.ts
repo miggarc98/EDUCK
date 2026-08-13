@@ -1,13 +1,14 @@
 // store/auth.store.ts
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { User, AuthState } from '@/features/auth_users/types';
+import type { User, AuthState, AuthResponse } from '@/features/auth_users/types';
 import { authApi } from '@/features/auth_users/services/api';
 
 interface AuthStore extends AuthState {
     tenantHost: string | null;
     isCheckingAuth: boolean;
-    login: (email: string, password: string) => Promise<void>;
+    login: (email: string, password: string) => Promise<AuthResponse>;
+    completeLogin: (token: string, refresh: string, user: User) => void;
     register: (data: any) => Promise<void>;
     logout: () => Promise<void>;
     checkAuth: () => Promise<void>;
@@ -27,33 +28,54 @@ export const useAuthStore = create<AuthStore>()(
                 set({ isLoading: true });
                 try {
                     const response = await authApi.login({ email, password });
-                    localStorage.setItem('auth_token', response.token);
+                    
+                    if (response.requires_2fa) {
+                        set({ isLoading: false });
+                        return response;
+                    }
+
+                    if (response.token) {
+                        localStorage.setItem('auth_token', response.token);
+                    }
                     if (response.refresh) {
                         localStorage.setItem('refresh_token', response.refresh);
                     }
                     set({
-                        user: response.user,
-                        isAuthenticated: true,
+                        user: response.user || null,
+                        isAuthenticated: !!response.token,
                         isLoading: false,
                         tenantHost: window.location.hostname
                     });
+                    return response;
                 } catch (error) {
                     set({ isLoading: false });
                     throw error;
                 }
             },
 
+            completeLogin: (token: string, refresh: string, user: User) => {
+                localStorage.setItem('auth_token', token);
+                localStorage.setItem('refresh_token', refresh);
+                set({
+                    user,
+                    isAuthenticated: true,
+                    tenantHost: window.location.hostname
+                });
+            },
+
             register: async (data: any) => {
                 set({ isLoading: true });
                 try {
                     const response = await authApi.register(data);
-                    localStorage.setItem('auth_token', response.token);
+                    if (response.token) {
+                        localStorage.setItem('auth_token', response.token);
+                    }
                     if (response.refresh) {
                         localStorage.setItem('refresh_token', response.refresh);
                     }
                     set({
-                        user: response.user,
-                        isAuthenticated: true,
+                        user: response.user || null,
+                        isAuthenticated: !!response.token,
                         isLoading: false,
                         tenantHost: window.location.hostname
                     });

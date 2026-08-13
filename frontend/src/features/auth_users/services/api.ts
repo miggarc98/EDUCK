@@ -8,10 +8,40 @@ import type {
 } from '../types';
 
 export const authApi = {
-    login: async (credentials: LoginCredentials): Promise<AuthResponse & { refresh?: string }> => {
+    login: async (credentials: LoginCredentials): Promise<AuthResponse> => {
         const response = await apiClient.post('/auth/login/', credentials);
         return {
-            token: response.data.access,
+            token: response.data.token || response.data.access,
+            refresh: response.data.refresh,
+            user: response.data.user,
+            requires_2fa: response.data.requires_2fa,
+            '2fa_token': response.data['2fa_token'],
+            setup_required: response.data.setup_required,
+            secret: response.data.secret,
+            qr_code: response.data.qr_code,
+        };
+    },
+
+    activate2FA: async (twoFactorToken: string, code: string): Promise<AuthResponse & { backup_codes?: string[] }> => {
+        const response = await apiClient.post('/auth/2fa/activate/', {
+            '2fa_token': twoFactorToken,
+            code
+        });
+        return {
+            token: response.data.token || response.data.access,
+            refresh: response.data.refresh,
+            user: response.data.user,
+            backup_codes: response.data.backup_codes
+        };
+    },
+
+    verify2FA: async (twoFactorToken: string, code: string): Promise<AuthResponse> => {
+        const response = await apiClient.post('/auth/2fa/verify/', {
+            '2fa_token': twoFactorToken,
+            code
+        });
+        return {
+            token: response.data.token || response.data.access,
             refresh: response.data.refresh,
             user: response.data.user
         };

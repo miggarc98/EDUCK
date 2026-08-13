@@ -1,19 +1,37 @@
 import { useState } from 'react';
-import { LoginCredentials } from '../types';
+import { LoginCredentials, AuthResponse } from '../types';
 import { useAuthStore } from '@/store/auth.store';
 
 export const useLogin = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [twoFactorInfo, setTwoFactorInfo] = useState<{
+        requires_2fa: boolean;
+        '2fa_token'?: string;
+        setup_required?: boolean;
+        secret?: string;
+        qr_code?: string;
+    } | null>(null);
+
     const storeLogin = useAuthStore((state) => state.login);
 
-    const login = async (credentials: LoginCredentials): Promise<boolean> => {
+    const login = async (credentials: LoginCredentials): Promise<AuthResponse | null> => {
         setLoading(true);
         setError(null);
+        setTwoFactorInfo(null);
 
         try {
-            await storeLogin(credentials.email, credentials.password);
-            return true;
+            const response = await storeLogin(credentials.email, credentials.password);
+            if (response.requires_2fa) {
+                setTwoFactorInfo({
+                    requires_2fa: true,
+                    '2fa_token': response['2fa_token'],
+                    setup_required: response.setup_required,
+                    secret: response.secret,
+                    qr_code: response.qr_code,
+                });
+            }
+            return response;
         } catch (err: any) {
             let message = 'Ocurrió un error inesperado al iniciar sesión.';
             
@@ -47,11 +65,11 @@ export const useLogin = () => {
             }
             
             setError(message);
-            return false;
+            return null;
         } finally {
             setLoading(false);
         }
     };
 
-    return { login, loading, error };
+    return { login, loading, error, twoFactorInfo, setTwoFactorInfo };
 };

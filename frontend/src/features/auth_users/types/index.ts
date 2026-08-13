@@ -3,7 +3,7 @@ export interface User {
     email: string;
     first_name: string;
     last_name: string;
-    role: 'coordinator' | 'teacher' | 'student' | 'parent';
+    role: 'superadmin' | 'admin' | 'coordinator' | 'teacher' | 'student' | 'parent';
     is_active?: boolean;
 }
 
@@ -14,8 +14,14 @@ export interface AuthState {
 }
 
 export interface AuthResponse {
-    token: string;
-    user: User;
+    token?: string;
+    refresh?: string;
+    user?: User;
+    requires_2fa?: boolean;
+    '2fa_token'?: string;
+    setup_required?: boolean;
+    secret?: string;
+    qr_code?: string;
 }
 
 export interface RegisterData {

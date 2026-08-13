@@ -9,25 +9,39 @@ import { usePasswordRecovery } from '../hooks/usePasswordRecovery';
 import { LoadingOverlay } from '@/shared/components/molecules/LoadingOverlay';
 import { AuthView } from '../types';
 import { useNavigate } from 'react-router-dom';
+import { TwoFactorModal } from './TwoFactorModal';
+import { useAuthStore } from '@/store/auth.store';
 
 export const LoginLayout = () => {
     const [currentView, setCurrentView] = useState<AuthView>('login');
     const [recoveryEmail, setRecoveryEmail] = useState('');
 
-    const { login, loading: loginLoading, error: loginError } = useLogin();
+    const { login, loading: loginLoading, error: loginError, twoFactorInfo, setTwoFactorInfo } = useLogin();
     const { recoverPassword, loading: recoveryLoading, error: recoveryError } = usePasswordRecovery();
+    const completeLogin = useAuthStore((state) => state.completeLogin);
 
     const isLoading = loginLoading || recoveryLoading;
 
     const navigate = useNavigate();
 
     const handleLogin = async (credentials: { email: string; password: string }) => {
-        const success = await login(credentials);
+        const response = await login(credentials);
 
-        if (success) {
-            navigate('/dashboard');
-            console.log('Login exitoso');
+        if (response) {
+            if (response.requires_2fa) {
+                console.log('Se requiere verificación de segundo factor (2FA)');
+            } else {
+                navigate('/dashboard');
+                console.log('Login exitoso');
+            }
         }
+    };
+
+    const handleTwoFactorSuccess = (data: { token: string; refresh: string; user: any }) => {
+        completeLogin(data.token, data.refresh, data.user);
+        setTwoFactorInfo(null);
+        navigate('/dashboard');
+        console.log('Login con 2FA exitoso');
     };
 
     const handlePasswordRecovery = async (data: { email: string }) => {
@@ -98,6 +112,17 @@ export const LoginLayout = () => {
                     </div>
                 </div>
             </div>
+            {twoFactorInfo && (
+                <TwoFactorModal
+                    isOpen={true}
+                    setupRequired={!!twoFactorInfo.setup_required}
+                    twoFactorToken={twoFactorInfo['2fa_token'] || ''}
+                    qrCode={twoFactorInfo.qr_code}
+                    secret={twoFactorInfo.secret}
+                    onSuccess={handleTwoFactorSuccess}
+                    onCancel={() => setTwoFactorInfo(null)}
+                />
+            )}
         </div>
     );
 };

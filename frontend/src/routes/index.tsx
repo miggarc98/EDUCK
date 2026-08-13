@@ -3,6 +3,7 @@ import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { MainLayout } from '@/layouts/MainLayout';
 import { AuthLayout } from '@/layouts/AuthLayout';
 import { LoginPage } from '@/features/auth_users/pages/LoginPage';
+import { NotFoundPage } from '@/shared/pages/NotFoundPage';
 
 // Componente temporal para dashboard
 const DashboardPage = () => (
@@ -36,5 +37,9 @@ export const router = createBrowserRouter([
                 element: <DashboardPage />,
             },
         ],
+    },
+    {
+        path: '*',
+        element: <NotFoundPage />,
     },
 ]);

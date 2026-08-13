@@ -15,3 +15,5 @@ django-oauth-toolkit
 pytest
 pytest-django
 factory-boy
+pyotp
+qrcode

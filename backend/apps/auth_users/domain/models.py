@@ -2,6 +2,8 @@ from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 
 class UserRole(models.TextChoices):
+    SUPERADMIN = 'superadmin', 'Superadministrador'
+    ADMIN = 'admin', 'Administrador'
     COORDINATOR = 'coordinator', 'Coordinador'
     TEACHER = 'teacher', 'Docente'
     STUDENT = 'student', 'Estudiante'
@@ -20,7 +22,7 @@ class UserManager(BaseUserManager):
     def create_superuser(self, email, password=None, **extra_fields):
         extra_fields.setdefault('is_staff', True)
         extra_fields.setdefault('is_superuser', True)
-        extra_fields.setdefault('role', UserRole.COORDINATOR)
+        extra_fields.setdefault('role', UserRole.SUPERADMIN)
 
         if extra_fields.get('is_staff') is not True:
             raise ValueError('El superusuario debe tener is_staff=True.')
@@ -41,6 +43,9 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     date_joined = models.DateTimeField(auto_now_add=True)
+    two_factor_secret = models.CharField(max_length=32, blank=True, null=True)
+    two_factor_enabled = models.BooleanField(default=False)
+    backup_codes = models.JSONField(default=list, blank=True)
 
     objects = UserManager()
 
