@@ -5,6 +5,8 @@ import type { User, AuthState } from '@/features/auth_users/types';
 import { authApi } from '@/features/auth_users/services/api';
 
 interface AuthStore extends AuthState {
+    tenantHost: string | null;
+    isCheckingAuth: boolean;
     login: (email: string, password: string) => Promise<void>;
     register: (data: any) => Promise<void>;
     logout: () => Promise<void>;
@@ -18,6 +20,8 @@ export const useAuthStore = create<AuthStore>()(
             user: null,
             isAuthenticated: false,
             isLoading: false,
+            tenantHost: null,
+            isCheckingAuth: true,
 
             login: async (email: string, password: string) => {
                 set({ isLoading: true });
@@ -30,7 +34,8 @@ export const useAuthStore = create<AuthStore>()(
                     set({
                         user: response.user,
                         isAuthenticated: true,
-                        isLoading: false
+                        isLoading: false,
+                        tenantHost: window.location.hostname
                     });
                 } catch (error) {
                     set({ isLoading: false });
@@ -49,7 +54,8 @@ export const useAuthStore = create<AuthStore>()(
                     set({
                         user: response.user,
                         isAuthenticated: true,
-                        isLoading: false
+                        isLoading: false,
+                        tenantHost: window.location.hostname
                     });
                 } catch (error) {
                     set({ isLoading: false });
@@ -65,25 +71,34 @@ export const useAuthStore = create<AuthStore>()(
                 } finally {
                     localStorage.removeItem('auth_token');
                     localStorage.removeItem('refresh_token');
-                    set({ user: null, isAuthenticated: false, isLoading: false });
+                    set({ user: null, isAuthenticated: false, isLoading: false, tenantHost: null });
                 }
             },
 
-
             checkAuth: async () => {
-                const token = localStorage.getItem('auth_token');
-                if (!token) {
-                    set({ isAuthenticated: false, user: null });
+                const currentHost = window.location.hostname;
+                const storedHost = get().tenantHost;
+
+                if (storedHost && storedHost !== currentHost) {
+                    localStorage.removeItem('auth_token');
+                    localStorage.removeItem('refresh_token');
+                    set({ user: null, isAuthenticated: false, tenantHost: currentHost, isCheckingAuth: false });
                     return;
                 }
 
-                set({ isLoading: true });
+                const token = localStorage.getItem('auth_token');
+                if (!token) {
+                    set({ isAuthenticated: false, user: null, tenantHost: currentHost, isCheckingAuth: false });
+                    return;
+                }
+
+                set({ isCheckingAuth: true });
                 try {
                     const user = await authApi.getCurrentUser();
-                    set({ user, isAuthenticated: true, isLoading: false });
+                    set({ user, isAuthenticated: true, isCheckingAuth: false, tenantHost: currentHost });
                 } catch (error) {
                     localStorage.removeItem('auth_token');
-                    set({ user: null, isAuthenticated: false, isLoading: false });
+                    set({ user: null, isAuthenticated: false, isCheckingAuth: false, tenantHost: currentHost });
                 }
             },
 
@@ -95,7 +110,8 @@ export const useAuthStore = create<AuthStore>()(
             name: 'auth-storage',
             partialize: (state) => ({
                 user: state.user,
-                isAuthenticated: state.isAuthenticated
+                isAuthenticated: state.isAuthenticated,
+                tenantHost: state.tenantHost
             }),
         }
     )

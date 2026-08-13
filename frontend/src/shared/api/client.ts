@@ -31,8 +31,9 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
     (response) => response,
     async (error: AxiosError) => {
-        if (error.response?.status === 401) {
-            // Token expirado o inválido
+        const isLoginRequest = error.config?.url?.includes('/auth/login') || error.config?.url?.includes('login');
+        if (error.response?.status === 401 && !isLoginRequest) {
+            // Token expirado o inválido (no redireccionar si es la petición de login)
             localStorage.removeItem('auth_token');
             window.location.href = '/login';
         }
