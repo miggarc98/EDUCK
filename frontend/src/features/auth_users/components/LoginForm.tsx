@@ -162,11 +162,11 @@ export const LoginForm = ({ onSubmit, onForgotPassword, loading, error: external
                     disabled={loading || (!email || !password)}
                     fullWidth
                     size="lg"
-                    className="mt-2 bg-blue-600 hover:bg-blue-700 text-white"
+                    className="mt-2 bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center"
                 >
                     {!loading && (
                         <>
-                            <LogIn className="w-4 h-4" />
+                            <LogIn className="w-4 h-4 mr-2" />
                             <span>Ingresar al Sistema</span>
                         </>
                     )}

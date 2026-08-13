@@ -13,7 +13,9 @@ import {
   BookOpen,
   Calendar,
   FileQuestion,
+  UserCog,
 } from "lucide-react";
+import { useAuthStore } from "@/store/auth.store";
 
 interface SidebarProps {
   currentView: string;
@@ -30,8 +32,12 @@ export function Sidebar({
   toggleCollapse,
   onLogout,
 }: SidebarProps) {
+  const { user } = useAuthStore();
+  const isAdminOrSuperAdmin = user?.role === 'admin' || user?.role === 'superadmin';
+
   const menuItems = [
     { id: "dashboard", icon: LayoutDashboard, label: "Tablero" },
+    ...(isAdminOrSuperAdmin ? [{ id: "users", icon: UserCog, label: "Usuarios" }] : []),
     { id: "courses", icon: BookOpen, label: "Cursos" },
     { id: "schedule", icon: Calendar, label: "Horarios" },
     { id: "students", icon: Users, label: "Estudiantes" },

@@ -209,3 +209,92 @@ class TwoFactorVerifyView(APIView):
                 'role': user.role,
             }
         }, status=status.HTTP_200_OK)
+
+class UserProfileView(generics.RetrieveAPIView):
+    serializer_class = UserSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_object(self):
+        return self.request.user
+
+class LogoutView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        try:
+            refresh_token = request.data.get("refresh")
+            if not refresh_token:
+                return Response(
+                    {"detail": "El token de refresco (refresh) es requerido."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+            return Response(
+                {"detail": "Sesión cerrada correctamente."},
+                status=status.HTTP_200_OK
+            )
+        except Exception as e:
+            return Response(
+                {"detail": str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+from rest_framework.pagination import PageNumberPagination
+
+class StandardResultsSetPagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+
+class UsersListView(generics.ListAPIView):
+    serializer_class = UserSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    pagination_class = StandardResultsSetPagination
+
+    def get_queryset(self):
+        if self.request.user.role not in ['superadmin', 'admin']:
+            from django.core.exceptions import PermissionDenied
+            raise PermissionDenied("No tienes permisos para ver esta lista.")
+        
+        queryset = User.objects.exclude(role='superadmin').order_by('id')
+        
+        name = self.request.query_params.get('name')
+        if name:
+            from django.db.models import Q
+            queryset = queryset.filter(Q(first_name__icontains=name) | Q(last_name__icontains=name))
+            
+        email = self.request.query_params.get('email')
+        if email:
+            queryset = queryset.filter(email__icontains=email)
+            
+        role = self.request.query_params.get('role')
+        if role:
+            queryset = queryset.filter(role=role)
+            
+        status_param = self.request.query_params.get('status')
+        if status_param:
+            if status_param.lower() in ['active', 'true']:
+                queryset = queryset.filter(is_active=True)
+            elif status_param.lower() in ['blocked', 'inactive', 'false']:
+                queryset = queryset.filter(is_active=False)
+                
+        return queryset
+
+class UserUpdateView(generics.UpdateAPIView):
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def perform_update(self, serializer):
+        if self.request.user.role not in ['superadmin', 'admin']:
+            from django.core.exceptions import PermissionDenied
+            raise PermissionDenied("No tienes permisos para editar usuarios.")
+        
+        instance = self.get_object()
+        if instance.role == 'superadmin':
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError("No se puede editar una cuenta SuperAdmin.")
+        
+        serializer.save()
+

@@ -4,6 +4,8 @@ import { MainLayout } from '@/layouts/MainLayout';
 import { AuthLayout } from '@/layouts/AuthLayout';
 import { LoginPage } from '@/features/auth_users/pages/LoginPage';
 import { NotFoundPage } from '@/shared/pages/NotFoundPage';
+import { UsersListPage } from '@/features/platform_admin';
+import { SettingsPage } from '@/features/institution';
 
 // Componente temporal para dashboard
 const DashboardPage = () => (
@@ -35,6 +37,14 @@ export const router = createBrowserRouter([
             {
                 path: 'dashboard',
                 element: <DashboardPage />,
+            },
+            {
+                path: 'users',
+                element: <UsersListPage />,
+            },
+            {
+                path: 'settings',
+                element: <SettingsPage />,
             },
         ],
     },

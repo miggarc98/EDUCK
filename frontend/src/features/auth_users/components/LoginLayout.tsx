@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, Sun, Moon } from 'lucide-react';
 import { LoginForm } from './LoginForm';
 import { ForgotPasswordForm } from './ForgotPasswordForm';
 import { RecoverySentMessage } from './RecoverySentMessage';
@@ -11,8 +11,10 @@ import { AuthView } from '../types';
 import { useNavigate } from 'react-router-dom';
 import { TwoFactorModal } from './TwoFactorModal';
 import { useAuthStore } from '@/store/auth.store';
+import { useTheme } from '@/shared/components/ThemeProvider';
 
 export const LoginLayout = () => {
+    const { theme, setTheme } = useTheme();
     const [currentView, setCurrentView] = useState<AuthView>('login');
     const [recoveryEmail, setRecoveryEmail] = useState('');
 
@@ -61,6 +63,17 @@ export const LoginLayout = () => {
     return (
         <div className="min-h-screen relative flex items-center justify-center p-4 overflow-hidden bg-slate-50 dark:bg-slate-950">
             {isLoading && <LoadingOverlay message="Autenticando usuario..." />}
+
+            {/* Theme Toggle Button */}
+            <div className="absolute top-4 right-4 z-20">
+                <button
+                    onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+                    className="p-2.5 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-800/50 rounded-xl transition-all border border-slate-200/60 dark:border-slate-800/60 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm shadow-sm"
+                    aria-label="Toggle theme"
+                >
+                    {theme === 'light' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+                </button>
+            </div>
 
             {/* Abstract Background */}
             <div className="absolute inset-0 z-0">

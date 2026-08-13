@@ -6,6 +6,8 @@ from apps.auth_users.api.views import (
     LogoutView,
     TwoFactorActivateView,
     TwoFactorVerifyView,
+    UsersListView,
+    UserUpdateView,
 )
 
 urlpatterns = [
@@ -15,4 +17,6 @@ urlpatterns = [
     path('logout/', LogoutView.as_view(), name='auth_logout'),
     path('2fa/activate/', TwoFactorActivateView.as_view(), name='2fa_activate'),
     path('2fa/verify/', TwoFactorVerifyView.as_view(), name='2fa_verify'),
+    path('users/', UsersListView.as_view(), name='users_list'),
+    path('users/<int:pk>/', UserUpdateView.as_view(), name='user_update'),
 ]

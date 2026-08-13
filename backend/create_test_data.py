@@ -70,6 +70,17 @@ def main():
             ('docente.a@colegioa.edu.co', 'password123', 'Maria', 'Rodriguez', UserRole.TEACHER),
             ('padre.a@colegioa.edu.co', 'password123', 'Pedro', 'Acosta', UserRole.PARENT),
         ]
+        
+        first_names = ['Juan', 'Maria', 'Pedro', 'Ana', 'Luis', 'Sofia', 'Carlos', 'Laura', 'Diego', 'Lucia', 'Jose', 'Elena']
+        last_names = ['Gomez', 'Rodriguez', 'Martinez', 'Garcia', 'Lopez', 'Perez', 'Sanchez', 'Gonzalez', 'Fernandez', 'Torres']
+        roles = [UserRole.TEACHER, UserRole.STUDENT, UserRole.PARENT, UserRole.COORDINATOR]
+
+        for i in range(1, 121):
+            fn = first_names[i % len(first_names)]
+            ln = last_names[i % len(last_names)]
+            role = roles[i % len(roles)]
+            users_a.append((f"user.a.{i}@colegioa.edu.co", "password123", f"{fn} {i}", ln, role))
+
         create_tenant_and_users('inst_a', 'Colegio A', 'colegioa.localhost', users_a)
 
         # Institution B
@@ -80,6 +91,13 @@ def main():
             ('estudiante.b@colegiob.edu.co', 'password123', 'Juan', 'Castro', UserRole.STUDENT),
             ('padre.b@colegiob.edu.co', 'password123', 'Patricia', 'Suarez', UserRole.PARENT),
         ]
+
+        for i in range(1, 121):
+            fn = first_names[i % len(first_names)]
+            ln = last_names[i % len(last_names)]
+            role = roles[i % len(roles)]
+            users_b.append((f"user.b.{i}@colegiob.edu.co", "password123", f"{fn} {i}", ln, role))
+
         create_tenant_and_users('inst_b', 'Colegio B', 'colegiob.localhost', users_b)
 
         print("\n🎉 ¡Datos de prueba generados con éxito!")
