@@ -28,10 +28,12 @@ export const authApi = {
 
     logout: async (): Promise<void> => {
         try {
-            localStorage.clear();
-            sessionStorage.clear();
+            const refresh = localStorage.getItem('refresh_token');
+            if (refresh) {
+                await apiClient.post('/auth/logout/', { refresh });
+            }
         } catch (error) {
-            console.error('Error al cerrar sesión:', error);
+            console.error('Error al cerrar sesión en el servidor:', error);
         }
     },
 
