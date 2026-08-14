@@ -58,35 +58,80 @@ def create_tenant_and_users(schema_name, tenant_name, domain_name, users_data):
             }
             for level, degrees in degrees_by_level.items():
                 for deg in degrees:
-                    course_name = f"Grado {deg}A"
-                    course, c_created = Course.objects.get_or_create(
-                        name=course_name,
-                        defaults={
-                            'level': level,
-                            'degree': deg,
-                            'director': random.choice(teachers)
-                        }
-                    )
-                    if c_created:
-                        print(f"    ✅ Curso creado en {schema_name}: {course_name} (Director: {course.director.email})")
-                    else:
-                        if not course.director and teachers:
-                            course.director = random.choice(teachers)
-                            course.save()
-                            print(f"    🔄 Curso actualizado con director en {schema_name}: {course_name} (Director: {course.director.email})")
+                    for section in ["A", "B"]:
+                        course_name = f"Grado {deg}{section}"
+                        course, c_created = Course.objects.get_or_create(
+                            name=course_name,
+                            defaults={
+                                'level': level,
+                                'degree': deg,
+                                'director': random.choice(teachers)
+                            }
+                        )
+                        if c_created:
+                            print(f"    ✅ Curso creado en {schema_name}: {course_name} (Director: {course.director.email})")
                         else:
-                            print(f"    ⚠️  El curso {course_name} ya existe en {schema_name}")
+                            if not course.director and teachers:
+                                course.director = random.choice(teachers)
+                                course.save()
+                                print(f"    🔄 Curso actualizado con director en {schema_name}: {course_name} (Director: {course.director.email})")
+                            else:
+                                print(f"    ⚠️  El curso {course_name} ya existe en {schema_name}")
 
-            # Assign students to courses randomly
+            # Assign students to courses randomly and create StudentProfile
+            from apps.enrollment.domain.models import StudentProfile
+            import datetime
+            import re
+
             students = list(User.objects.filter(role=UserRole.STUDENT))
             courses_list = list(Course.objects.all())
+            blood_types = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-']
+            med_notes = [
+                'Alérgico a la penicilina. Asma leve.',
+                'Ninguna conocida.',
+                'Intolerancia a la lactosa.',
+                'Ninguna conocida. Usa gafas formuladas.',
+                'Usa inhalador para asma.'
+            ]
+            relations = ['Madre', 'Padre', 'Tía', 'Tío', 'Abuela', 'Abuelo']
+            g_first_names = ['María', 'Carlos', 'Ana', 'Pedro', 'Rosa', 'Luis', 'Sofía', 'Jorge']
+            g_last_names = ['Pérez', 'García', 'López', 'Rodríguez', 'Sánchez', 'Gómez']
+
             if students and courses_list:
-                for student in students:
+                for idx, student in enumerate(students):
                     assigned_course = random.choice(courses_list)
                     student.current_course = assigned_course
                     student.current_degree = assigned_course.degree
                     student.save()
-                print(f"    ✅ {len(students)} estudiantes asignados a cursos en {schema_name}")
+
+                    # Calculate age based on degree
+                    deg = assigned_course.degree or "6º"
+                    match = re.search(r'\d+', deg)
+                    if match:
+                        grade_num = int(match.group())
+                        age = grade_num + 5
+                    else:
+                        age = 5 # Pre-Jardín, Jardín, Transición
+                    
+                    birth_year = 2026 - age # Current year is 2026 based on metadata
+                    birth_date = datetime.date(birth_year, 1, 1)
+
+                    # Create or update StudentProfile
+                    StudentProfile.objects.update_or_create(
+                        user=student,
+                        defaults={
+                            'phone': f"+57 300 {100 + (idx % 100):03d} {4567 + idx:04d}",
+                            'address': f"Calle {idx + 1} #{45 + (idx % 50)}-{67 + (idx % 30)}, Bogotá",
+                            'birth_date': birth_date,
+                            'blood_type': random.choice(blood_types),
+                            'medical_notes': random.choice(med_notes),
+                            'guardian_name': f"{random.choice(g_first_names)} {random.choice(g_last_names)}",
+                            'guardian_relation': random.choice(relations),
+                            'guardian_phone': f"+57 310 {987 - (idx % 100):03d} {6543 - idx:04d}",
+                            'guardian_email': f"acudiente.{student.id}@ejemplo.com"
+                        }
+                    )
+                print(f"    ✅ {len(students)} estudiantes asignados a cursos y con perfiles creados en {schema_name}")
 
 def main():
     try:
@@ -116,13 +161,19 @@ def main():
         
         first_names = ['Juan', 'Maria', 'Pedro', 'Ana', 'Luis', 'Sofia', 'Carlos', 'Laura', 'Diego', 'Lucia', 'Jose', 'Elena']
         last_names = ['Gomez', 'Rodriguez', 'Martinez', 'Garcia', 'Lopez', 'Perez', 'Sanchez', 'Gonzalez', 'Fernandez', 'Torres']
-        roles = [UserRole.TEACHER, UserRole.STUDENT, UserRole.PARENT, UserRole.COORDINATOR]
-
-        for i in range(1, 121):
+        # Generate other roles (teachers, coordinators, parents)
+        roles = [UserRole.TEACHER, UserRole.PARENT, UserRole.COORDINATOR]
+        for i in range(1, 61):
             fn = first_names[i % len(first_names)]
             ln = last_names[i % len(last_names)]
             role = roles[i % len(roles)]
             users_a.append((f"user.a.{i}@colegioa.edu.co", "password123", f"{fn} {i}", ln, role))
+
+        # Generate 200 explicit students for Colegio A
+        for i in range(1, 201):
+            fn = first_names[i % len(first_names)]
+            ln = last_names[i % len(last_names)]
+            users_a.append((f"student.a.{i}@colegioa.edu.co", "password123", f"Estudiante A{i}", f"{ln} {fn}", UserRole.STUDENT))
 
         create_tenant_and_users('inst_a', 'Colegio A', 'colegioa.localhost', users_a)
 
@@ -135,11 +186,18 @@ def main():
             ('padre.b@colegiob.edu.co', 'password123', 'Patricia', 'Suarez', UserRole.PARENT),
         ]
 
-        for i in range(1, 121):
+        # Generate other roles for Colegio B
+        for i in range(1, 61):
             fn = first_names[i % len(first_names)]
             ln = last_names[i % len(last_names)]
             role = roles[i % len(roles)]
             users_b.append((f"user.b.{i}@colegiob.edu.co", "password123", f"{fn} {i}", ln, role))
+
+        # Generate 200 explicit students for Colegio B
+        for i in range(1, 201):
+            fn = first_names[i % len(first_names)]
+            ln = last_names[i % len(last_names)]
+            users_b.append((f"student.b.{i}@colegiob.edu.co", "password123", f"Estudiante B{i}", f"{ln} {fn}", UserRole.STUDENT))
 
         create_tenant_and_users('inst_b', 'Colegio B', 'colegiob.localhost', users_b)
 

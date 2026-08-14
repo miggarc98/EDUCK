@@ -7,6 +7,7 @@ import { NotFoundPage } from '@/shared/pages/NotFoundPage';
 import { UsersListPage } from '@/features/platform_admin';
 import { SettingsPage } from '@/features/institution';
 import { CoursesModule } from '@/features/curriculum';
+import { StudentsDirectory } from '@/features/enrollment';
 
 // Componente temporal para dashboard
 const DashboardPage = () => (
@@ -46,6 +47,10 @@ export const router = createBrowserRouter([
             {
                 path: 'courses',
                 element: <CoursesModule />,
+            },
+            {
+                path: 'students',
+                element: <StudentsDirectory />,
             },
             {
                 path: 'settings',
