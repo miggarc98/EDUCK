@@ -6,6 +6,7 @@ import { LoginPage } from '@/features/auth_users/pages/LoginPage';
 import { NotFoundPage } from '@/shared/pages/NotFoundPage';
 import { UsersListPage } from '@/features/platform_admin';
 import { SettingsPage } from '@/features/institution';
+import { CoursesModule } from '@/features/curriculum';
 
 // Componente temporal para dashboard
 const DashboardPage = () => (
@@ -41,6 +42,10 @@ export const router = createBrowserRouter([
             {
                 path: 'users',
                 element: <UsersListPage />,
+            },
+            {
+                path: 'courses',
+                element: <CoursesModule />,
             },
             {
                 path: 'settings',

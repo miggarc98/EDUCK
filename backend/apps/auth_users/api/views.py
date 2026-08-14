@@ -253,7 +253,7 @@ class UsersListView(generics.ListAPIView):
     pagination_class = StandardResultsSetPagination
 
     def get_queryset(self):
-        if self.request.user.role not in ['superadmin', 'admin']:
+        if self.request.user.role not in ['superadmin', 'admin', 'coordinator']:
             from django.core.exceptions import PermissionDenied
             raise PermissionDenied("No tienes permisos para ver esta lista.")
         
