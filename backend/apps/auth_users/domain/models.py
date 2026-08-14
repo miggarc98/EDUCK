@@ -47,6 +47,16 @@ class User(AbstractBaseUser, PermissionsMixin):
     two_factor_enabled = models.BooleanField(default=False)
     backup_codes = models.JSONField(default=list, blank=True)
 
+    current_course = models.ForeignKey(
+        'curriculum.Course',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='students',
+        db_constraint=False
+    )
+    current_degree = models.CharField(max_length=50, blank=True, null=True)
+
     objects = UserManager()
 
     USERNAME_FIELD = 'email'

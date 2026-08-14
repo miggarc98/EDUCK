@@ -6,6 +6,8 @@ export interface User {
     role: 'superadmin' | 'admin' | 'coordinator' | 'teacher' | 'student' | 'parent';
     is_active?: boolean;
     two_factor_enabled?: boolean;
+    current_course?: number | null;
+    current_degree?: string | null;
 }
 
 export interface AuthState {

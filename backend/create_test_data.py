@@ -45,6 +45,49 @@ def create_tenant_and_users(schema_name, tenant_name, domain_name, users_data):
                 )
                 print(f"  ✅ Usuario creado en {schema_name}: {email} ({role})")
 
+        # Create test courses/groups for each degree
+        from apps.curriculum.domain.models import Course
+        import random
+        teachers = list(User.objects.filter(role=UserRole.TEACHER))
+        if teachers:
+            degrees_by_level = {
+                "Preescolar": ["Pre-Jardín", "Jardín", "Transición"],
+                "Básica Primaria": ["1º", "2º", "3º", "4º", "5º"],
+                "Básica Secundaria": ["6º", "7º", "8º", "9º"],
+                "Media Académica": ["10º", "11º"]
+            }
+            for level, degrees in degrees_by_level.items():
+                for deg in degrees:
+                    course_name = f"Grado {deg}A"
+                    course, c_created = Course.objects.get_or_create(
+                        name=course_name,
+                        defaults={
+                            'level': level,
+                            'degree': deg,
+                            'director': random.choice(teachers)
+                        }
+                    )
+                    if c_created:
+                        print(f"    ✅ Curso creado en {schema_name}: {course_name} (Director: {course.director.email})")
+                    else:
+                        if not course.director and teachers:
+                            course.director = random.choice(teachers)
+                            course.save()
+                            print(f"    🔄 Curso actualizado con director en {schema_name}: {course_name} (Director: {course.director.email})")
+                        else:
+                            print(f"    ⚠️  El curso {course_name} ya existe en {schema_name}")
+
+            # Assign students to courses randomly
+            students = list(User.objects.filter(role=UserRole.STUDENT))
+            courses_list = list(Course.objects.all())
+            if students and courses_list:
+                for student in students:
+                    assigned_course = random.choice(courses_list)
+                    student.current_course = assigned_course
+                    student.current_degree = assigned_course.degree
+                    student.save()
+                print(f"    ✅ {len(students)} estudiantes asignados a cursos en {schema_name}")
+
 def main():
     try:
         # Create public tenant
