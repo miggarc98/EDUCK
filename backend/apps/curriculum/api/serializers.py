@@ -33,11 +33,7 @@ class CourseSerializer(serializers.ModelSerializer):
         read_only_fields = ('id',)
 
     def get_students(self, obj):
-        # Temporary hardcoded value (e.g. 30 + obj.id)
-        val = 30
-        if obj.id:
-            val += (obj.id % 8)
-        return val
+        return obj.students.count()
 
     def get_avgGrade(self, obj):
         # Temporary hardcoded value

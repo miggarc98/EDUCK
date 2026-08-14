@@ -8,5 +8,6 @@ urlpatterns = [
     path('api/curriculum/', include('apps.curriculum.api.urls')),
     path('api/enrollment/', include('apps.enrollment.api.urls')),
     path('api/core/', include('apps.core.api.urls')),
+    path('api/academics/', include('apps.academics.api.urls')),
 ]
 

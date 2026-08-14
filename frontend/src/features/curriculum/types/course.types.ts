@@ -5,6 +5,11 @@ export interface Teacher {
   last_name: string;
   role: string;
   is_active: boolean;
+  name?: string;
+  employee_id?: string;
+  area?: string;
+  load?: number;
+  status?: 'active' | 'on_leave';
 }
 
 export interface Course {
