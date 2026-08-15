@@ -26,11 +26,20 @@ export interface DisciplineCase {
   status: string;
 }
 
+export interface StudentAcademicHistory {
+  id: number;
+  year: number;
+  degree: string;
+  course: number | null;
+  course_name: string | null;
+}
+
 export interface Student extends User {
   course_detail?: Course | null;
   profile?: StudentProfile | null;
   performance: StudentPerformance;
   disciplineCases: DisciplineCase[];
+  academic_history?: StudentAcademicHistory[];
 }
 export interface PaginatedStudents {
   count: number;

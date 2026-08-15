@@ -34,14 +34,14 @@ type CourseSubTabType = "students" | "subjects";
 
 export function CoursesModule() {
   const [activeTab, setActiveTab] = useState<TabType>("courses");
-  
+
   // Core loaded states
   const [courses, setCourses] = useState<Course[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [settings, setSettings] = useState<InstitutionSettingData | null>(null);
   const [areas, setAreas] = useState<Area[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
-  
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -49,7 +49,7 @@ export function CoursesModule() {
   const [searchTerm, setSearchTerm] = useState("");
   const [searchAreaTerm, setSearchAreaTerm] = useState("");
   const [searchSubjectTerm, setSearchSubjectTerm] = useState("");
-  
+
   // Filter states
   const [filterSubjectArea, setFilterSubjectArea] = useState<string>("");
 
@@ -85,7 +85,7 @@ export function CoursesModule() {
   const [courseSubTab, setCourseSubTab] = useState<CourseSubTabType>("students");
   const [students, setStudents] = useState<Student[]>([]);
   const [studentsLoading, setStudentsLoading] = useState(false);
-  
+
   // Profiles view states
   const [selectedStudentForProfile, setSelectedStudentForProfile] = useState<Student | null>(null);
   const [selectedTeacherForProfile, setSelectedTeacherForProfile] = useState<Teacher | null>(null);
@@ -353,7 +353,7 @@ export function CoursesModule() {
       subj.name.toLowerCase().includes(searchSubjectTerm.toLowerCase()) ||
       (subj.description && subj.description.toLowerCase().includes(searchSubjectTerm.toLowerCase())) ||
       (subj.area_detail && subj.area_detail.name.toLowerCase().includes(searchSubjectTerm.toLowerCase()));
-    
+
     const matchesArea = filterSubjectArea ? subj.area === Number(filterSubjectArea) : true;
     return matchesSearch && matchesArea;
   });
@@ -367,7 +367,7 @@ export function CoursesModule() {
   const getGroupedSubjectsForCourse = () => {
     const courseSubjects = getSubjectsForSelectedCourse();
     const groups: { [areaName: string]: Subject[] } = {};
-    
+
     courseSubjects.forEach((subj) => {
       const areaName = subj.area_detail?.name || "Otras Áreas";
       if (!groups[areaName]) {
@@ -375,7 +375,7 @@ export function CoursesModule() {
       }
       groups[areaName].push(subj);
     });
-    
+
     return groups;
   };
 
@@ -383,12 +383,12 @@ export function CoursesModule() {
     const perf = selectedStudentForProfile.performance || { gpa: 4.0, attendance: 95, lastPeriodRank: "1/30" };
     const cases = selectedStudentForProfile.disciplineCases || [];
     const profile = selectedStudentForProfile.profile || {};
-    
+
     return (
       <div className="max-w-6xl mx-auto pb-12 relative px-4 sm:px-6">
         {/* Breadcrumbs Trail */}
         <nav className="mb-6 flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-900/20 px-4 py-2.5 rounded-xl border border-slate-100 dark:border-slate-800 shadow-sm">
-          <button 
+          <button
             onClick={() => {
               setSelectedCourseForStudents(null);
               setSelectedStudentForProfile(null);
@@ -399,7 +399,7 @@ export function CoursesModule() {
             <span>Cursos</span>
           </button>
           <span className="text-slate-400 dark:text-slate-650 font-bold">/</span>
-          <button 
+          <button
             onClick={() => setSelectedStudentForProfile(null)}
             className="hover:text-blue-600 dark:hover:text-blue-400 font-semibold transition-colors"
           >
@@ -425,17 +425,17 @@ export function CoursesModule() {
 
               <div className="w-full border-t border-slate-100 dark:border-slate-800 pt-6 space-y-4 text-left">
                 <h3 className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">Información Personal</h3>
-                
+
                 <div className="flex items-center gap-2.5 text-sm text-slate-600 dark:text-slate-300">
                   <Phone className="w-4 h-4 text-slate-400" />
                   <span>{profile.phone || "Sin teléfono registrado"}</span>
                 </div>
-                
+
                 <div className="flex items-start gap-2.5 text-sm text-slate-600 dark:text-slate-300">
                   <MapPin className="w-4 h-4 text-slate-400 mt-0.5" />
                   <span>{profile.address || "Sin dirección registrada"}</span>
                 </div>
-                
+
                 {profile.birth_date && (
                   <div className="flex items-center gap-2.5 text-sm text-slate-600 dark:text-slate-300">
                     <Calendar className="w-4 h-4 text-slate-400" />
@@ -513,7 +513,7 @@ export function CoursesModule() {
                 <ShieldAlert className="w-5 h-5 text-amber-500" />
                 Historial de Convivencia
               </h3>
-              
+
               {cases.length > 0 ? (
                 <div className="space-y-3">
                   {cases.map((c, i) => (
@@ -557,7 +557,7 @@ export function CoursesModule() {
       <div className="max-w-6xl mx-auto pb-12 relative px-4 sm:px-6">
         {/* Breadcrumbs Trail */}
         <nav className="mb-6 flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-900/20 px-4 py-2.5 rounded-xl border border-slate-100 dark:border-slate-800 shadow-sm">
-          <button 
+          <button
             onClick={() => setSelectedCourseForStudents(null)}
             className="hover:text-blue-600 dark:hover:text-blue-400 font-semibold transition-colors flex items-center gap-1.5"
           >
@@ -588,7 +588,7 @@ export function CoursesModule() {
               )}
             </p>
           </div>
-          <div 
+          <div
             onClick={() => selectedCourseForStudents.director_detail && setSelectedTeacherForProfile(selectedCourseForStudents.director_detail)}
             className={`flex items-center gap-3 bg-white dark:bg-slate-900 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800/80 ${selectedCourseForStudents.director_detail ? 'cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/85 transition-colors' : ''}`}
           >
@@ -612,11 +612,10 @@ export function CoursesModule() {
         <div className="mb-6 border-b border-slate-200 dark:border-slate-700 flex gap-4">
           <button
             onClick={() => setCourseSubTab("students")}
-            className={`pb-3 font-semibold text-sm transition-all relative ${
-              courseSubTab === "students"
+            className={`pb-3 font-semibold text-sm transition-all relative ${courseSubTab === "students"
                 ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400"
                 : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
-            }`}
+              }`}
           >
             <span className="flex items-center gap-2">
               <Users className="w-4 h-4" /> Estudiantes ({students.length})
@@ -624,11 +623,10 @@ export function CoursesModule() {
           </button>
           <button
             onClick={() => setCourseSubTab("subjects")}
-            className={`pb-3 font-semibold text-sm transition-all relative ${
-              courseSubTab === "subjects"
+            className={`pb-3 font-semibold text-sm transition-all relative ${courseSubTab === "subjects"
                 ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400"
                 : "text-slate-500 dark:text-slate-400 hover:text-slate-850 dark:hover:text-slate-200"
-            }`}
+              }`}
           >
             <span className="flex items-center gap-2">
               <BookOpen className="w-4 h-4" /> Asignaturas Dictadas ({getSubjectsForSelectedCourse().length})
@@ -661,11 +659,11 @@ export function CoursesModule() {
                   const perf = student.performance || { gpa: 4.0, attendance: 95, lastPeriodRank: "1/30" };
                   const cases = student.disciplineCases || [];
                   const gpaColor = perf.gpa >= 4.0 ? "text-emerald-600 dark:text-emerald-455 bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/50" :
-                                   perf.gpa >= 3.0 ? "text-amber-600 dark:text-amber-450 bg-amber-50 dark:bg-amber-955/20 border-amber-200 dark:border-amber-900/50" :
-                                   "text-rose-600 dark:text-rose-450 bg-rose-50 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900/50";
+                    perf.gpa >= 3.0 ? "text-amber-600 dark:text-amber-450 bg-amber-50 dark:bg-amber-955/20 border-amber-200 dark:border-amber-900/50" :
+                      "text-rose-600 dark:text-rose-450 bg-rose-50 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900/50";
 
                   return (
-                    <div 
+                    <div
                       key={student.id}
                       onClick={() => setSelectedStudentForProfile(student)}
                       className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:border-slate-200 dark:hover:border-slate-700 transition-all hover:bg-slate-100 dark:hover:bg-slate-800/60 cursor-pointer"
@@ -749,9 +747,6 @@ export function CoursesModule() {
                               {subj.description || "Sin descripción disponible."}
                             </p>
                           </div>
-                          <div className="mt-3 text-[10px] text-slate-400 flex items-center gap-1.5 uppercase font-medium">
-                            <Check className="w-3 h-3 text-emerald-500" /> Dictada en {subj.courses.length} curso(s)
-                          </div>
                         </div>
                       ))}
                     </div>
@@ -781,7 +776,7 @@ export function CoursesModule() {
             {activeTab === "subjects" && "Administra y configura las asignaturas/materias dictadas y sus cursos asociados."}
           </p>
         </div>
-        
+
         {activeTab === "courses" && (
           <button
             onClick={openCreateModal}
@@ -791,7 +786,7 @@ export function CoursesModule() {
             <span>Nuevo Curso</span>
           </button>
         )}
-        
+
         {activeTab === "areas" && (
           <button
             onClick={openCreateAreaModal}
@@ -823,38 +818,35 @@ export function CoursesModule() {
       <div className="mb-6 border-b border-slate-200 dark:border-slate-700 flex gap-4">
         <button
           onClick={() => { setActiveTab("courses"); setSearchTerm(""); }}
-          className={`pb-3 font-semibold text-sm transition-all relative ${
-            activeTab === "courses"
+          className={`pb-3 font-semibold text-sm transition-all relative ${activeTab === "courses"
               ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400"
               : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
-          }`}
+            }`}
         >
           Cursos
         </button>
         <button
           onClick={() => { setActiveTab("areas"); setSearchAreaTerm(""); }}
-          className={`pb-3 font-semibold text-sm transition-all relative ${
-            activeTab === "areas"
+          className={`pb-3 font-semibold text-sm transition-all relative ${activeTab === "areas"
               ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400"
               : "text-slate-500 dark:text-slate-400 hover:text-slate-850 dark:hover:text-slate-200"
-          }`}
+            }`}
         >
           Áreas Académicas
         </button>
         <button
           onClick={() => { setActiveTab("subjects"); setSearchSubjectTerm(""); setFilterSubjectArea(""); }}
-          className={`pb-3 font-semibold text-sm transition-all relative ${
-            activeTab === "subjects"
+          className={`pb-3 font-semibold text-sm transition-all relative ${activeTab === "subjects"
               ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400"
               : "text-slate-500 dark:text-slate-400 hover:text-slate-850 dark:hover:text-slate-200"
-          }`}
+            }`}
         >
           Asignaturas
         </button>
       </div>
 
       {/* TABS CONTENT */}
-      
+
       {/* 1. COURSES TAB */}
       {activeTab === "courses" && (
         <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-visible animate-fade-in">
@@ -925,7 +917,7 @@ export function CoursesModule() {
                               <MoreHorizontal className="w-4 h-4" />
                             </button>
                             {activeDropdown === course.id && (
-                              <div 
+                              <div
                                 onClick={(e) => e.stopPropagation()}
                                 className="absolute right-0 top-full mt-1 bg-white dark:bg-slate-850 shadow-lg border border-slate-205 dark:border-slate-750 rounded-lg py-1 z-10 w-28"
                               >
@@ -1057,7 +1049,7 @@ export function CoursesModule() {
                               {course.level}
                             </span>
                           </td>
-                          <td 
+                          <td
                             className="px-6 py-4"
                             onClick={(e) => {
                               if (course.director_detail) {
@@ -1107,7 +1099,7 @@ export function CoursesModule() {
                               <MoreHorizontal className="w-5 h-5" />
                             </button>
                             {activeDropdown === course.id && (
-                              <div 
+                              <div
                                 onClick={(e) => e.stopPropagation()}
                                 className="absolute right-6 top-12 mt-1 bg-white dark:bg-slate-800 shadow-xl border border-slate-200 dark:border-slate-705 rounded-lg py-1.5 z-20 w-36"
                               >
@@ -1264,7 +1256,7 @@ export function CoursesModule() {
                 className="w-full pl-9 pr-4 py-2 bg-white dark:bg-slate-800 border border-slate-202 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-805 dark:text-slate-200 placeholder:text-slate-400"
               />
             </div>
-            
+
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <select
                 value={filterSubjectArea}
@@ -1591,7 +1583,7 @@ export function CoursesModule() {
                 <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
                   Cursos donde se Imparte esta Asignatura
                 </label>
-                
+
                 {courses.length === 0 ? (
                   <p className="text-xs text-slate-400 italic">No hay cursos académicos registrados para asociar.</p>
                 ) : (
@@ -1599,20 +1591,18 @@ export function CoursesModule() {
                     {courses.map((course) => {
                       const isChecked = subjectCourses.includes(course.id);
                       return (
-                        <div 
+                        <div
                           key={course.id}
                           onClick={() => handleToggleCourseForSubject(course.id)}
-                          className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs cursor-pointer select-none transition-all ${
-                            isChecked
+                          className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs cursor-pointer select-none transition-all ${isChecked
                               ? "bg-blue-50 dark:bg-blue-950/20 border-blue-300 dark:border-blue-900/60 text-blue-700 dark:text-blue-400 font-semibold"
                               : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700"
-                          }`}
+                            }`}
                         >
-                          <div className={`w-4 h-4 rounded flex items-center justify-center border transition-all ${
-                            isChecked 
-                              ? "bg-blue-600 border-blue-600 text-white" 
+                          <div className={`w-4 h-4 rounded flex items-center justify-center border transition-all ${isChecked
+                              ? "bg-blue-600 border-blue-600 text-white"
                               : "border-slate-350 dark:border-slate-600"
-                          }`}>
+                            }`}>
                             {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
                           </div>
                           <span className="truncate">{course.name}</span>
@@ -1647,9 +1637,9 @@ export function CoursesModule() {
       )}
 
       {selectedTeacherForProfile && (
-        <TeacherProfile 
-          teacher={selectedTeacherForProfile} 
-          onBack={() => setSelectedTeacherForProfile(null)} 
+        <TeacherProfile
+          teacher={selectedTeacherForProfile}
+          onBack={() => setSelectedTeacherForProfile(null)}
         />
       )}
     </div>

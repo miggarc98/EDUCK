@@ -26,3 +26,30 @@ class StudentProfile(models.Model):
 
     def __str__(self):
         return f"Perfil de {self.user.email}"
+
+
+class StudentAcademicHistory(models.Model):
+    student = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='academic_history'
+    )
+    year = models.IntegerField()
+    degree = models.CharField(max_length=50)
+    course = models.ForeignKey(
+        'curriculum.Course',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_constraint=False
+    )
+
+    class Meta:
+        db_table = 'enrollment_student_academic_history'
+        verbose_name = 'Historial Académico'
+        verbose_name_plural = 'Historiales Académicos'
+        unique_together = ('student', 'year')
+        ordering = ['-year']
+
+    def __str__(self):
+        return f"{self.student.email} - {self.degree} ({self.year})"

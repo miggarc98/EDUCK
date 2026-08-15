@@ -8,6 +8,7 @@ export interface User {
     two_factor_enabled?: boolean;
     current_course?: number | null;
     current_degree?: string | null;
+    enrollment_status?: 'pre_enrolled' | 'enrolled' | 'withdrawn' | 'graduated' | null;
 }
 
 export interface AuthState {

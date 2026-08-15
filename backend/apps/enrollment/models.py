@@ -1,3 +1,3 @@
-from apps.enrollment.domain.models import StudentProfile
+from apps.enrollment.domain.models import StudentProfile, StudentAcademicHistory
 
-__all__ = ['StudentProfile']
+__all__ = ['StudentProfile', 'StudentAcademicHistory']

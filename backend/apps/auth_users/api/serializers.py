@@ -6,7 +6,7 @@ from apps.auth_users.models import User
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ('id', 'email', 'first_name', 'last_name', 'role', 'is_active', 'current_course', 'current_degree')
+        fields = ('id', 'email', 'first_name', 'last_name', 'role', 'is_active', 'current_course', 'current_degree', 'enrollment_status')
         read_only_fields = ('id', 'email')
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):

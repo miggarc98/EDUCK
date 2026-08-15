@@ -9,6 +9,12 @@ class UserRole(models.TextChoices):
     STUDENT = 'student', 'Estudiante'
     PARENT = 'parent', 'Padre'
 
+class EnrollmentStatus(models.TextChoices):
+    PRE_ENROLLED = 'pre_enrolled', 'Prematriculado'
+    ENROLLED = 'enrolled', 'Matriculado'
+    WITHDRAWN = 'withdrawn', 'Retirado'
+    GRADUATED = 'graduated', 'Graduado'
+
 class UserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
         if not email:
@@ -56,6 +62,12 @@ class User(AbstractBaseUser, PermissionsMixin):
         db_constraint=False
     )
     current_degree = models.CharField(max_length=50, blank=True, null=True)
+    enrollment_status = models.CharField(
+        max_length=20,
+        choices=EnrollmentStatus.choices,
+        blank=True,
+        null=True
+    )
 
     objects = UserManager()
 
@@ -67,3 +79,29 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return self.email
+
+    def save(self, *args, **kwargs):
+        # Set default enrollment status for student if not set
+        if self.role == UserRole.STUDENT and not self.enrollment_status:
+            self.enrollment_status = EnrollmentStatus.PRE_ENROLLED
+            
+        super().save(*args, **kwargs)
+        
+        # Save academic history for the active academic year if student
+        if self.role == UserRole.STUDENT and self.current_degree:
+            from apps.institution.domain.models import InstitutionSetting
+            from apps.enrollment.domain.models import StudentAcademicHistory
+            try:
+                academic_year = InstitutionSetting.get_solo().academic_year
+                StudentAcademicHistory.objects.update_or_create(
+                    student=self,
+                    year=academic_year,
+                    defaults={
+                        'degree': self.current_degree,
+                        'course': self.current_course
+                    }
+                )
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Error updating academic history for student {self.email}: {e}")

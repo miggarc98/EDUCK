@@ -18,6 +18,20 @@ import { enrollmentApi } from "../services/api";
 import type { Student } from "../types";
 import { curriculumApi, type Course } from "@/features/curriculum";
 
+const ENROLLMENT_STATUS_LABELS: Record<string, string> = {
+  pre_enrolled: "Prematriculado",
+  enrolled: "Matriculado",
+  withdrawn: "Retirado",
+  graduated: "Graduado"
+};
+
+const ENROLLMENT_STATUS_CLASSES: Record<string, string> = {
+  pre_enrolled: "bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800/50",
+  enrolled: "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/50",
+  withdrawn: "bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-800/50",
+  graduated: "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800/50"
+};
+
 export function StudentsDirectory() {
   const [students, setStudents] = useState<Student[]>([]);
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
@@ -73,6 +87,29 @@ export function StudentsDirectory() {
     }
   };
 
+  const [savingStatus, setSavingStatus] = useState(false);
+
+  const handleUpdateStatus = async (newStatus: string) => {
+    if (!selectedStudentId) return;
+    setSavingStatus(true);
+    setError(null);
+    try {
+      const updated = await enrollmentApi.updateStudentProfile(selectedStudentId, {
+        enrollment_status: newStatus as any
+      });
+      setStudents((prev) =>
+        prev.map((s) =>
+          s.id === selectedStudentId ? { ...s, enrollment_status: updated.enrollment_status } : s
+        )
+      );
+    } catch (err) {
+      console.error(err);
+      setError("No se pudo actualizar el estado de matrícula.");
+    } finally {
+      setSavingStatus(false);
+    }
+  };
+
   const handlePageChange = (page: number) => {
     if (page >= 1 && page <= totalPages) {
       setCurrentPage(page);
@@ -124,12 +161,41 @@ export function StudentsDirectory() {
                 EST-{selectedStudent.id.toString().padStart(4, '0')}
               </p>
 
-              <div className="mt-4 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 text-xs font-semibold border border-emerald-200 dark:border-emerald-800/50">
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
-                {selectedStudent.is_active ? "Activo" : "Inactivo"}
+              <div className="flex flex-wrap justify-center gap-2 mt-4">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 text-xs font-semibold border border-emerald-200 dark:border-emerald-800/50">
+                  <div className={`w-1.5 h-1.5 rounded-full ${selectedStudent.is_active ? 'bg-emerald-500' : 'bg-slate-400'}`}></div>
+                  {selectedStudent.is_active ? "Activo" : "Inactivo"}
+                </div>
+                {selectedStudent.enrollment_status && (
+                  <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${ENROLLMENT_STATUS_CLASSES[selectedStudent.enrollment_status] || ''}`}>
+                    {ENROLLMENT_STATUS_LABELS[selectedStudent.enrollment_status] || selectedStudent.enrollment_status}
+                  </div>
+                )}
               </div>
 
-              <div className="w-full mt-6 pt-6 border-t border-slate-100 dark:border-slate-800 flex flex-col gap-3 text-left">
+              <div className="w-full mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 text-left">
+                <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
+                  Estado de Matrícula
+                </label>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={selectedStudent.enrollment_status || "pre_enrolled"}
+                    onChange={(e) => handleUpdateStatus(e.target.value)}
+                    disabled={savingStatus}
+                    className="flex-1 px-2.5 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-850 dark:text-slate-200 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none disabled:opacity-50 font-medium"
+                  >
+                    <option value="pre_enrolled">Prematriculado</option>
+                    <option value="enrolled">Matriculado</option>
+                    <option value="withdrawn">Retirado</option>
+                    <option value="graduated">Graduado</option>
+                  </select>
+                  {savingStatus && (
+                    <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin shrink-0"></div>
+                  )}
+                </div>
+              </div>
+
+              <div className="w-full mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 flex flex-col gap-3 text-left">
                 <div className="flex items-center gap-3 text-sm">
                   <GraduationCap className="w-4 h-4 text-slate-400" />
                   <span className="text-slate-700 dark:text-slate-300">
@@ -309,6 +375,46 @@ export function StudentsDirectory() {
                 </div>
               )}
             </div>
+
+            {/* Academic History Timeline Card */}
+            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <GraduationCap className="w-5 h-5 text-indigo-500" />
+                <h3 className="font-bold text-slate-800 dark:text-slate-100 text-lg">
+                  Historial Académico (Obligación Legal)
+                </h3>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+                Registro histórico de grados y cursos por año lectivo para emisión de certificados.
+              </p>
+
+              {selectedStudent.academic_history && selectedStudent.academic_history.length > 0 ? (
+                <div className="overflow-hidden rounded-xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-905">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 dark:bg-slate-800/50 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider border-b border-slate-100 dark:border-slate-800">
+                        <th className="p-3">Año Lectivo</th>
+                        <th className="p-3">Grado</th>
+                        <th className="p-3">Curso</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-sm">
+                      {selectedStudent.academic_history.map((hist) => (
+                        <tr key={hist.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
+                          <td className="p-3 font-bold text-slate-800 dark:text-slate-200">{hist.year}</td>
+                          <td className="p-3 text-slate-600 dark:text-slate-350">{hist.degree}</td>
+                          <td className="p-3 text-slate-500 dark:text-slate-400">{hist.course_name || "Sin curso asignado"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="p-6 text-center text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/30 rounded-xl border border-dashed border-slate-200 dark:border-slate-700 text-xs">
+                  No se registran años lectivos anteriores para este estudiante.
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -455,9 +561,16 @@ export function StudentsDirectory() {
                         <UserCircle className="w-6 h-6" />
                       </div>
                       <div>
-                        <span className="text-sm font-bold text-slate-800 dark:text-slate-100 block">
-                          {displayName}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-slate-800 dark:text-slate-100 block">
+                            {displayName}
+                          </span>
+                          {student.enrollment_status && (
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold border ${ENROLLMENT_STATUS_CLASSES[student.enrollment_status] || ''}`}>
+                              {ENROLLMENT_STATUS_LABELS[student.enrollment_status] || student.enrollment_status}
+                            </span>
+                          )}
+                        </div>
                         <span className="text-xs font-mono text-slate-500 dark:text-slate-400 block">
                           EST-{student.id.toString().padStart(4, '0')}
                         </span>

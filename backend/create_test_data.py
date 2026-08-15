@@ -50,12 +50,26 @@ def create_tenant_and_users(schema_name, tenant_name, domain_name, users_data):
         import random
         teachers = list(User.objects.filter(role=UserRole.TEACHER))
         if teachers:
+            # Create teacher profiles
+            from apps.academics.domain.models import TeacherProfile
+            for teacher in teachers:
+                TeacherProfile.objects.get_or_create(
+                    user=teacher,
+                    defaults={
+                        'area': random.choice(["Matemáticas", "Ciencias Naturales", "Humanidades", "Ciencias Sociales", "Tecnología"]),
+                        'academic_load': random.randint(10, 25),
+                        'status': 'active'
+                    }
+                )
+            print(f"    ✅ Perfiles de docente creados para {len(teachers)} docentes en {schema_name}")
+
             degrees_by_level = {
                 "Preescolar": ["Pre-Jardín", "Jardín", "Transición"],
                 "Básica Primaria": ["1º", "2º", "3º", "4º", "5º"],
                 "Básica Secundaria": ["6º", "7º", "8º", "9º"],
                 "Media Académica": ["10º", "11º"]
             }
+            courses_list = []
             for level, degrees in degrees_by_level.items():
                 for deg in degrees:
                     for section in ["A", "B"]:
@@ -68,6 +82,7 @@ def create_tenant_and_users(schema_name, tenant_name, domain_name, users_data):
                                 'director': random.choice(teachers)
                             }
                         )
+                        courses_list.append(course)
                         if c_created:
                             print(f"    ✅ Curso creado en {schema_name}: {course_name} (Director: {course.director.email})")
                         else:
@@ -77,6 +92,32 @@ def create_tenant_and_users(schema_name, tenant_name, domain_name, users_data):
                                 print(f"    🔄 Curso actualizado con director en {schema_name}: {course_name} (Director: {course.director.email})")
                             else:
                                 print(f"    ⚠️  El curso {course_name} ya existe en {schema_name}")
+
+            # Create Areas and Subjects, link them to courses
+            from apps.curriculum.domain.models import Area, Subject
+            areas_data = {
+                "Matemáticas": ["Matemáticas", "Geometría"],
+                "Ciencias Naturales": ["Biología", "Física", "Química"],
+                "Humanidades e Idiomas": ["Lengua Castellana", "Inglés"],
+                "Ciencias Sociales": ["Ciencias Sociales", "Historia"],
+                "Tecnología e Informática": ["Informática"]
+            }
+
+            for area_name, subject_names in areas_data.items():
+                area, _ = Area.objects.get_or_create(
+                    name=area_name,
+                    defaults={'description': f"Área de {area_name}", 'is_mandatory': True}
+                )
+                for sub_name in subject_names:
+                    subject, s_created = Subject.objects.get_or_create(
+                        name=sub_name,
+                        area=area,
+                        defaults={'description': f"Asignatura {sub_name}"}
+                    )
+                    if courses_list:
+                        subject.courses.set(courses_list)
+
+            print(f"    ✅ Áreas y asignaturas creadas y asociadas a cursos en {schema_name}")
 
             # Assign students to courses randomly and create StudentProfile
             from apps.enrollment.domain.models import StudentProfile
@@ -102,7 +143,29 @@ def create_tenant_and_users(schema_name, tenant_name, domain_name, users_data):
                     assigned_course = random.choice(courses_list)
                     student.current_course = assigned_course
                     student.current_degree = assigned_course.degree
+                    student.enrollment_status = random.choices(
+                        ['pre_enrolled', 'enrolled', 'withdrawn', 'graduated'],
+                        weights=[10, 80, 5, 5]
+                    )[0]
                     student.save()
+
+                    # Generate previous year's history for some students to have realistic data
+                    from apps.enrollment.domain.models import StudentAcademicHistory
+                    deg = assigned_course.degree or ""
+                    match = re.search(r'(\d+)', deg)
+                    if match:
+                        grade_num = int(match.group(1))
+                        current_year = 2024
+                        # If student is in a grade higher than 5º, generate up to 2 years of prior history
+                        if grade_num > 5:
+                            for yr_offset in range(1, min(3, grade_num - 4)):
+                                prev_year = current_year - yr_offset
+                                prev_grade = f"{grade_num - yr_offset}º"
+                                StudentAcademicHistory.objects.update_or_create(
+                                    student=student,
+                                    year=prev_year,
+                                    defaults={'degree': prev_grade}
+                                )
 
                     # Calculate age based on degree
                     deg = assigned_course.degree or "6º"

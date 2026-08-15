@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from apps.enrollment.domain.models import StudentProfile
+from apps.enrollment.domain.models import StudentProfile, StudentAcademicHistory
 from apps.auth_users.models import User
 from apps.curriculum.api.serializers import CourseSerializer
 
@@ -11,9 +11,17 @@ class StudentProfileSerializer(serializers.ModelSerializer):
             'guardian_name', 'guardian_relation', 'guardian_phone', 'guardian_email'
         )
 
+class StudentAcademicHistorySerializer(serializers.ModelSerializer):
+    course_name = serializers.CharField(source='course.name', read_only=True)
+
+    class Meta:
+        model = StudentAcademicHistory
+        fields = ('id', 'year', 'degree', 'course', 'course_name')
+
 class StudentSerializer(serializers.ModelSerializer):
     profile = StudentProfileSerializer(source='student_profile', required=False)
     course_detail = CourseSerializer(source='current_course', read_only=True)
+    academic_history = StudentAcademicHistorySerializer(many=True, read_only=True)
     
     # Mock data fields required by the UI mockup
     performance = serializers.SerializerMethodField()
@@ -24,9 +32,9 @@ class StudentSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'email', 'first_name', 'last_name', 'role', 'is_active',
             'current_course', 'current_degree', 'course_detail', 'profile',
-            'performance', 'disciplineCases'
+            'performance', 'disciplineCases', 'enrollment_status', 'academic_history'
         )
-        read_only_fields = ('id', 'role')
+        read_only_fields = ('id', 'role', 'academic_history')
 
     def get_performance(self, obj):
         # Deterministic mock performance based on user ID
@@ -69,6 +77,7 @@ class StudentSerializer(serializers.ModelSerializer):
         instance.last_name = validated_data.get('last_name', instance.last_name)
         instance.current_course = validated_data.get('current_course', instance.current_course)
         instance.current_degree = validated_data.get('current_degree', instance.current_degree)
+        instance.enrollment_status = validated_data.get('enrollment_status', instance.enrollment_status)
         instance.save()
         
         # Update or create profile
