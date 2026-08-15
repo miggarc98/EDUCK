@@ -6,8 +6,9 @@ from apps.auth_users.models import User, UserRole
 class AreaSerializer(serializers.ModelSerializer):
     class Meta:
         model = Area
-        fields = ('id', 'name', 'description', 'is_active', 'created_at', 'updated_at')
+        fields = ('id', 'name', 'description', 'is_mandatory', 'is_active', 'created_at', 'updated_at')
         read_only_fields = ('id', 'created_at', 'updated_at')
+
 
 class SubjectSerializer(serializers.ModelSerializer):
     area_detail = AreaSerializer(source='area', read_only=True)

@@ -15,7 +15,6 @@ import {
   CheckCircle2,
   AlertTriangle,
   FileText,
-  Lock,
 } from "lucide-react";
 
 interface AuditLogViewerProps {
@@ -45,6 +44,131 @@ const FIELD_LABELS: Record<string, string> = {
   level_scales: "Escalas por Nivel",
   offered_degrees: "Grados Ofertados",
   settings_json: "Configuraciones Extendidas",
+};
+
+const NESTED_FIELD_LABELS: Record<string, string> = {
+  "academic.academic_year": "Año Lectivo (Calendario)",
+  "academic.current_period": "Periodo Actual",
+  "academic.start_time": "Hora Inicio Jornada",
+  "academic.end_time": "Hora Fin Jornada",
+  "academic.class_duration": "Duración de Clase",
+  "grading.general_scale": "Escala de Calificación General",
+  "grading.decimal_precision": "Precisión Decimal (Notas)",
+  "grading.min_passing_grade": "Nota Mínima para Aprobar",
+  "grading.independent_scale": "Escala Independiente por Grado",
+  "level_groups": "Estructura de Niveles y Grados",
+  "roles_permissions": "Permisos y Roles",
+};
+
+interface FlatChangeItem {
+  label: string;
+  key: string;
+  old: any;
+  new: any;
+  diffDetails?: {
+    added: string[];
+    removed: string[];
+  };
+}
+
+const getFlatChanges = (changes: Record<string, any>): FlatChangeItem[] => {
+  const flat: FlatChangeItem[] = [];
+  if (!changes) return flat;
+  
+  Object.entries(changes).forEach(([fieldKey, change]) => {
+    if (
+      fieldKey === "settings_json" &&
+      change.old &&
+      change.new &&
+      typeof change.old === "object" &&
+      typeof change.new === "object"
+    ) {
+      // academic
+      const oldAcademic = change.old.academic || {};
+      const newAcademic = change.new.academic || {};
+      const academicKeys = Array.from(new Set([...Object.keys(oldAcademic), ...Object.keys(newAcademic)]));
+      academicKeys.forEach((k) => {
+        const fullKey = `academic.${k}`;
+        const ov = oldAcademic[k];
+        const nv = newAcademic[k];
+        if (JSON.stringify(ov) !== JSON.stringify(nv)) {
+          flat.push({
+            label: NESTED_FIELD_LABELS[fullKey] || fullKey,
+            key: fullKey,
+            old: ov,
+            new: nv,
+          });
+        }
+      });
+
+      // grading
+      const oldGrading = change.old.grading || {};
+      const newGrading = change.new.grading || {};
+      const gradingKeys = Array.from(new Set([...Object.keys(oldGrading), ...Object.keys(newGrading)]));
+      gradingKeys.forEach((k) => {
+        const fullKey = `grading.${k}`;
+        const ov = oldGrading[k];
+        const nv = newGrading[k];
+        if (JSON.stringify(ov) !== JSON.stringify(nv)) {
+          flat.push({
+            label: NESTED_FIELD_LABELS[fullKey] || fullKey,
+            key: fullKey,
+            old: ov,
+            new: nv,
+          });
+        }
+      });
+
+      // other keys
+      const otherKeys = Array.from(
+        new Set([...Object.keys(change.old), ...Object.keys(change.new)])
+      ).filter((k) => k !== "academic" && k !== "grading");
+      otherKeys.forEach((k) => {
+        const ov = change.old[k];
+        const nv = change.new[k];
+        if (JSON.stringify(ov) !== JSON.stringify(nv)) {
+          if (k === "roles_permissions" && ov && nv && typeof ov === "object" && typeof nv === "object") {
+            const roleKeys = Array.from(new Set([...Object.keys(ov), ...Object.keys(nv)]));
+            roleKeys.forEach((roleId) => {
+              const oldPerms: string[] = ov[roleId] || [];
+              const newPerms: string[] = nv[roleId] || [];
+              
+              const added = newPerms.filter((p) => !oldPerms.includes(p));
+              const removed = oldPerms.filter((p) => !newPerms.includes(p));
+              
+              if (added.length > 0 || removed.length > 0) {
+                flat.push({
+                  label: `Permisos del Rol: ${roleId.charAt(0).toUpperCase() + roleId.slice(1)}`,
+                  key: `roles_permissions.${roleId}`,
+                  old: oldPerms,
+                  new: newPerms,
+                  diffDetails: {
+                    added,
+                    removed,
+                  },
+                });
+              }
+            });
+          } else {
+            flat.push({
+              label: NESTED_FIELD_LABELS[k] || k,
+              key: k,
+              old: ov,
+              new: nv,
+            });
+          }
+        }
+      });
+    } else {
+      flat.push({
+        label: FIELD_LABELS[fieldKey] || fieldKey,
+        key: fieldKey,
+        old: change.old,
+        new: change.new,
+      });
+    }
+  });
+  return flat;
 };
 
 export function AuditLogViewer({
@@ -215,7 +339,8 @@ export function AuditLogViewer({
         <div className="relative pl-6 space-y-6 before:absolute before:left-2.5 before:top-3 before:bottom-3 before:w-0.5 before:bg-slate-200 dark:before:bg-slate-800">
           {filteredLogs.map((log) => {
             const isExpanded = expandedLogs[log.id] ?? false;
-            const hasChanges = log.changes && Object.keys(log.changes).length > 0;
+            const flatChanges = getFlatChanges(log.changes);
+            const hasChanges = flatChanges.length > 0;
 
             const isRestore = log.action_type === "RESTORE";
             const isCreate = log.action_type === "CREATE";
@@ -310,41 +435,73 @@ export function AuditLogViewer({
                         className="flex items-center justify-between w-full px-3.5 py-2 bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 transition-colors border border-slate-200/60 dark:border-slate-700/50"
                       >
                         <span>
-                          {Object.keys(log.changes).length} campo(s) modificado(s)
+                          {flatChanges.length} campo(s) modificado(s)
                         </span>
                         {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                       </button>
 
                       {isExpanded && (
                         <div className="mt-3 space-y-2 border-t border-slate-100 dark:border-slate-800 pt-3">
-                          {Object.entries(log.changes).map(([fieldKey, change]) => {
-                            const label = FIELD_LABELS[fieldKey] || fieldKey;
+                          {flatChanges.map((change) => {
                             return (
                               <div
-                                key={fieldKey}
+                                key={change.key}
                                 className="p-3 bg-slate-50/70 dark:bg-slate-800/40 rounded-xl border border-slate-100 dark:border-slate-800/80 text-xs space-y-1.5"
                               >
                                 <div className="font-semibold text-slate-800 dark:text-slate-200">
-                                  {label} <span className="text-[10px] font-mono text-slate-400">({fieldKey})</span>
+                                  {change.label} <span className="text-[10px] font-mono text-slate-400">({change.key})</span>
                                 </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-                                  <div className="p-2 bg-rose-50 dark:bg-rose-950/30 border border-rose-200/60 dark:border-rose-900/50 rounded-lg text-rose-800 dark:text-rose-300">
-                                    <span className="block text-[10px] font-bold uppercase tracking-wider text-rose-500 mb-0.5">
-                                      Valor Anterior
-                                    </span>
-                                    <pre className="font-mono whitespace-pre-wrap break-all text-[11px]">
-                                      {formatValue(change.old)}
-                                    </pre>
+                                {change.diffDetails ? (
+                                  <div className="p-3.5 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200/60 dark:border-slate-700/50 space-y-3 mt-1.5 w-full">
+                                    {change.diffDetails.added && change.diffDetails.added.length > 0 && (
+                                      <div className="space-y-1.5">
+                                        <span className="block text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                                          Permisos Asignados (+)
+                                        </span>
+                                        <div className="flex flex-wrap gap-1.5">
+                                          {change.diffDetails.added.map((p: string) => (
+                                            <span key={p} className="inline-flex items-center px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/80 text-[10px] font-semibold">
+                                              + {p}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                    {change.diffDetails.removed && change.diffDetails.removed.length > 0 && (
+                                      <div className="space-y-1.5">
+                                        <span className="block text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">
+                                          Permisos Revocados (-)
+                                        </span>
+                                        <div className="flex flex-wrap gap-1.5">
+                                          {change.diffDetails.removed.map((p: string) => (
+                                            <span key={p} className="inline-flex items-center px-2.5 py-1 rounded-lg bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-805/80 text-[10px] font-semibold">
+                                              - {p}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
                                   </div>
-                                  <div className="p-2 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-900/50 rounded-lg text-emerald-800 dark:text-emerald-300">
-                                    <span className="block text-[10px] font-bold uppercase tracking-wider text-emerald-500 mb-0.5">
-                                      Valor Nuevo
-                                    </span>
-                                    <pre className="font-mono whitespace-pre-wrap break-all text-[11px]">
-                                      {formatValue(change.new)}
-                                    </pre>
+                                ) : (
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                                    <div className="p-2 bg-rose-50 dark:bg-rose-950/30 border border-rose-200/60 dark:border-rose-900/50 rounded-lg text-rose-800 dark:text-rose-300">
+                                      <span className="block text-[10px] font-bold uppercase tracking-wider text-rose-500 mb-0.5">
+                                        Valor Anterior
+                                      </span>
+                                      <pre className="font-mono whitespace-pre-wrap break-all text-[11px]">
+                                        {formatValue(change.old)}
+                                      </pre>
+                                    </div>
+                                    <div className="p-2 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-900/50 rounded-lg text-emerald-800 dark:text-emerald-300">
+                                      <span className="block text-[10px] font-bold uppercase tracking-wider text-emerald-500 mb-0.5">
+                                        Valor Nuevo
+                                      </span>
+                                      <pre className="font-mono whitespace-pre-wrap break-all text-[11px]">
+                                        {formatValue(change.new)}
+                                      </pre>
+                                    </div>
                                   </div>
-                                </div>
+                                )}
                               </div>
                             );
                           })}

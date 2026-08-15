@@ -62,6 +62,12 @@ export const curriculumApi = {
     await apiClient.delete(`/curriculum/areas/${id}/`);
   },
 
+  seedLey115: async (): Promise<{ areas_created: number; subjects_created: number; status: string }> => {
+    const response = await apiClient.post('/curriculum/areas/seed_ley115/');
+    return response.data;
+  },
+
+
   getSubjects: async (params?: { area?: number; course?: number }): Promise<Subject[]> => {
     const response = await apiClient.get<Subject[] | { results: Subject[] }>('/curriculum/subjects/', { params });
     if (Array.isArray(response.data)) {

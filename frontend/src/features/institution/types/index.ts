@@ -23,12 +23,14 @@ export interface InstitutionNotificationSettings {
 
 export interface InstitutionSettingData {
   id?: number;
-  name: string;
+  institution_name?: string;
   dane_nit: string;
   address: string;
   phone: string;
   email: string;
+  logo?: string;
   logo_url: string;
+  is_formal_education?: boolean;
 
   academic_year: number;
   active_period: string;

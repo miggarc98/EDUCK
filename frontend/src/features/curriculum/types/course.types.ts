@@ -39,6 +39,7 @@ export interface Area {
   id: number;
   name: string;
   description?: string;
+  is_mandatory?: boolean;
   is_active: boolean;
   created_at?: string;
   updated_at?: string;

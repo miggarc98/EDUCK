@@ -250,11 +250,9 @@ export function CoursesModule() {
   };
 
   const handleAreaDelete = async (id: number) => {
-    if (!confirm("¿Está seguro de eliminar esta área? Todas las asignaturas de esta área se verán afectadas.")) return;
     try {
       await curriculumApi.deleteArea(id);
       setAreas((prev) => prev.filter((a) => a.id !== id));
-      // Refresh subjects since cascade on delete
       const subjectsData = await curriculumApi.getSubjects();
       setSubjects(subjectsData);
       setActiveAreaDropdown(null);
@@ -311,15 +309,17 @@ export function CoursesModule() {
     }
   };
 
-  const handleSubjectDelete = async (id: number) => {
-    if (!confirm("¿Está seguro de eliminar esta asignatura?")) return;
+  const handleSubjectDelete = async (subject: Subject) => {
+    setActiveSubjectDropdown(null);
     try {
-      await curriculumApi.deleteSubject(id);
-      setSubjects((prev) => prev.filter((s) => s.id !== id));
-      setActiveSubjectDropdown(null);
-    } catch (err) {
-      console.error(err);
-      alert("Error al eliminar la asignatura");
+      await curriculumApi.deleteSubject(subject.id);
+      setSubjects((prev) => prev.filter((s) => s.id !== subject.id));
+      const updatedCourses = await curriculumApi.getCourses();
+      setCourses(updatedCourses);
+    } catch (err: any) {
+      console.error("Error al eliminar la asignatura:", err);
+      const msg = err.response?.data?.detail || "Error al eliminar la asignatura";
+      alert(msg);
     }
   };
 
@@ -1341,7 +1341,7 @@ export function CoursesModule() {
                                 <Edit className="w-4 h-4 text-slate-500" /> Editar
                               </button>
                               <button
-                                onClick={() => handleSubjectDelete(subj.id)}
+                                onClick={() => handleSubjectDelete(subj)}
                                 className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-955/20"
                               >
                                 <Trash className="w-4 h-4 text-red-500" /> Eliminar

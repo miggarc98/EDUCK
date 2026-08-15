@@ -1,0 +1,127 @@
+[
+  {
+    "nivel": "Educación Preescolar",
+    "ciclos": [
+      {
+        "nombre": "Preescolar",
+        "grados": [
+          {
+            "id_grado": "parvulos",
+            "nombre": "Párvulos",
+            "obligatorio_ley_115": false
+          },
+          {
+            "id_grado": "prejardin",
+            "nombre": "Pre-jardín",
+            "obligatorio_ley_115": false
+          },
+          {
+            "id_grado": "jardin",
+            "nombre": "Jardín",
+            "obligatorio_ley_115": false
+          },
+          {
+            "id_grado": "transicion",
+            "nombre": "Transición (Grado Cero)",
+            "obligatorio_ley_115": true
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "nivel": "Educación Básica",
+    "ciclos": [
+      {
+        "nombre": "Básica Primaria",
+        "grados": [
+          {
+            "id_grado": "1",
+            "nombre": "Grado 1°",
+            "obligatorio_ley_115": true
+          },
+          {
+            "id_grado": "2",
+            "nombre": "Grado 2°",
+            "obligatorio_ley_115": true
+          },
+          {
+            "id_grado": "3",
+            "nombre": "Grado 3°",
+            "obligatorio_ley_115": true
+          },
+          {
+            "id_grado": "4",
+            "nombre": "Grado 4°",
+            "obligatorio_ley_115": true
+          },
+          {
+            "id_grado": "5",
+            "nombre": "Grado 5°",
+            "obligatorio_ley_115": true
+          }
+        ]
+      },
+      {
+        "nombre": "Básica Secundaria",
+        "grados": [
+          {
+            "id_grado": "6",
+            "nombre": "Grado 6°",
+            "obligatorio_ley_115": true
+          },
+          {
+            "id_grado": "7",
+            "nombre": "Grado 7°",
+            "obligatorio_ley_115": true
+          },
+          {
+            "id_grado": "8",
+            "nombre": "Grado 8°",
+            "obligatorio_ley_115": true
+          },
+          {
+            "id_grado": "9",
+            "nombre": "Grado 9°",
+            "obligatorio_ley_115": true
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "nivel": "Educación Media",
+    "ciclos": [
+      {
+        "nombre": "Media Académica",
+        "grados": [
+          {
+            "id_grado": "10",
+            "nombre": "Grado 10°",
+            "obligatorio_ley_115": true
+          },
+          {
+            "id_grado": "11",
+            "nombre": "Grado 11°",
+            "obligatorio_ley_115": true
+          }
+        ]
+      },
+      {
+        "nombre": "Media Técnica",
+        "grados": [
+          {
+            "id_grado": "10_tec",
+            "nombre": "Grado 10° (Técnico)",
+            "obligatorio_ley_115": false
+          },
+          {
+            "id_grado": "11_tec",
+            "nombre": "Grado 11° (Técnico)",
+            "obligatorio_ley_115": false
+          }
+        ]
+      }
+    ]
+  }
+]
