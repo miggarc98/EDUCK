@@ -9,6 +9,7 @@ export interface CreateTeacherPayload {
   load?: number;
   status?: 'active' | 'on_leave';
   password?: string;
+  availability?: Record<string, { start_time: string; end_time: string }>;
 }
 
 export interface ClassSchedule {

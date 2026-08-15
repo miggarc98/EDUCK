@@ -60,6 +60,7 @@ class Subject(models.Model):
         help_text="Cursos en los que se dicta esta asignatura"
     )
     is_active = models.BooleanField(default=True)
+    weekly_hours = models.PositiveIntegerField(default=1, help_text="Intensidad horaria semanal máxima permitida por curso")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

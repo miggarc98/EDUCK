@@ -16,6 +16,7 @@ class TeacherProfile(models.Model):
         choices=[('active', 'Activo'), ('on_leave', 'En Licencia')],
         default='active'
     )
+    availability = models.JSONField(default=dict, blank=True, help_text="Disponibilidad horaria por día")
 
     class Meta:
         db_table = 'academics_teacher_profiles'

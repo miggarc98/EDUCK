@@ -10,6 +10,7 @@ export interface Teacher {
   area?: string;
   load?: number;
   status?: 'active' | 'on_leave';
+  availability?: Record<string, { start_time: string; end_time: string }>;
 }
 
 export interface Course {
@@ -53,6 +54,7 @@ export interface Subject {
   area_detail?: Area;
   courses: number[];
   courses_detail?: { id: number; name: string }[];
+  weekly_hours?: number;
   is_active: boolean;
   created_at?: string;
   updated_at?: string;

@@ -24,6 +24,7 @@ class SubjectSerializer(serializers.ModelSerializer):
             'area_detail', 
             'courses', 
             'courses_detail', 
+            'weekly_hours',
             'is_active', 
             'created_at', 
             'updated_at'

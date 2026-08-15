@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, User, Mail, BookOpen, Briefcase, Trash2, Edit2, Save, X } from 'lucide-react';
+import { ArrowLeft, User, Mail, BookOpen, Briefcase, Trash2, Edit2, Save, X, Clock } from 'lucide-react';
 import type { Teacher } from '../types';
 import { academicsApi } from '../services/api';
 
@@ -18,6 +18,7 @@ export function TeacherProfile({ teacher, onBack, onUpdate, onDelete }: TeacherP
   const [area, setArea] = useState(teacher.area || '');
   const [load, setLoad] = useState(teacher.load || 0);
   const [status, setStatus] = useState<any>(teacher.status || 'active');
+  const [availability, setAvailability] = useState<any>(teacher.availability || {});
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,7 +33,8 @@ export function TeacherProfile({ teacher, onBack, onUpdate, onDelete }: TeacherP
         email: email,
         area: area,
         load: Number(load),
-        status: status
+        status: status,
+        availability: availability
       });
       onUpdate(updated);
       setIsEditing(false);
@@ -243,6 +245,81 @@ export function TeacherProfile({ teacher, onBack, onUpdate, onDelete }: TeacherP
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+
+          {/* Disponibilidad Horaria */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
+            <h3 className="text-md font-bold text-slate-850 dark:text-slate-100 mb-4 flex items-center gap-2">
+              <Clock className="w-4 h-4 text-emerald-600" />
+              Disponibilidad Horaria en la Institución
+            </h3>
+
+            <div className="space-y-3">
+              {['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'].map((day) => {
+                const dayAvail = availability[day] || null;
+                const isDayAvail = !!dayAvail;
+                
+                return (
+                  <div key={day} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-3 bg-slate-50/50 dark:bg-slate-850 rounded-xl border border-slate-100 dark:border-slate-800/60 transition-all">
+                    <div className="flex items-center gap-2">
+                      {isEditing ? (
+                        <input
+                          type="checkbox"
+                          checked={isDayAvail}
+                          onChange={(e) => {
+                            const newAvail = { ...availability };
+                            if (e.target.checked) {
+                              newAvail[day] = { start_time: '08:00', end_time: '12:00' };
+                            } else {
+                              delete newAvail[day];
+                            }
+                            setAvailability(newAvail);
+                          }}
+                          className="w-4 h-4 text-emerald-600 border-slate-350 rounded focus:ring-emerald-500"
+                        />
+                      ) : (
+                        <span className={`w-2 h-2 rounded-full ${isDayAvail ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300 dark:bg-slate-700'}`} />
+                      )}
+                      <span className="text-xs font-bold text-slate-700 dark:text-slate-200 w-20">{day}</span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {isEditing ? (
+                        <>
+                          <input
+                            type="time"
+                            disabled={!isDayAvail}
+                            value={dayAvail?.start_time || '08:00'}
+                            onChange={(e) => {
+                              const newAvail = { ...availability };
+                              newAvail[day] = { ...newAvail[day], start_time: e.target.value };
+                              setAvailability(newAvail);
+                            }}
+                            className="px-2.5 py-1 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-750 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 text-slate-800 dark:text-slate-100 disabled:opacity-50"
+                          />
+                          <span className="text-slate-400 text-xs">-</span>
+                          <input
+                            type="time"
+                            disabled={!isDayAvail}
+                            value={dayAvail?.end_time || '12:00'}
+                            onChange={(e) => {
+                              const newAvail = { ...availability };
+                              newAvail[day] = { ...newAvail[day], end_time: e.target.value };
+                              setAvailability(newAvail);
+                            }}
+                            className="px-2.5 py-1 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-750 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 text-slate-800 dark:text-slate-100 disabled:opacity-50"
+                          />
+                        </>
+                      ) : (
+                        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                          {isDayAvail ? `${dayAvail.start_time} - ${dayAvail.end_time}` : 'Disponible toda la jornada'}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 

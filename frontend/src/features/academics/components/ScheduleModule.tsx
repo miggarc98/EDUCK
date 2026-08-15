@@ -88,7 +88,7 @@ export function ScheduleModule() {
   const [error, setError] = useState<string | null>(null);
 
   // Filters & State
-  const [viewMode, setViewMode] = useState<"course" | "teacher">("course");
+  const [viewMode, setViewMode] = useState<"course" | "teacher" | "general">("course");
   const [selectedCourseId, setSelectedCourseId] = useState<number | "">("");
   const [selectedTeacherId, setSelectedTeacherId] = useState<number | "">("");
   const [view, setView] = useState<"week" | "day">("week");
@@ -395,10 +395,20 @@ export function ScheduleModule() {
                 >
                   Por Docente
                 </button>
+                <button
+                  onClick={() => setViewMode("general")}
+                  className={`px-4 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                    viewMode === "general"
+                      ? "bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 shadow-sm"
+                      : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+                  }`}
+                >
+                  Vista General
+                </button>
               </div>
 
               {/* Selector according to ViewMode */}
-              {viewMode === "course" ? (
+              {viewMode === "course" && (
                 <select
                   value={selectedCourseId}
                   onChange={(e) => setSelectedCourseId(Number(e.target.value))}
@@ -410,7 +420,8 @@ export function ScheduleModule() {
                     </option>
                   ))}
                 </select>
-              ) : (
+              )}
+              {viewMode === "teacher" && (
                 <select
                   value={selectedTeacherId}
                   onChange={(e) => setSelectedTeacherId(Number(e.target.value))}
@@ -423,37 +434,53 @@ export function ScheduleModule() {
                   ))}
                 </select>
               )}
+              {viewMode === "general" && (
+                <div className="flex items-center gap-2 bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-700 text-slate-750 dark:text-slate-150 rounded-xl px-3 py-2 text-xs font-semibold">
+                  <CalendarIcon className="w-4 h-4 text-blue-500" />
+                  <select
+                    value={currentDay}
+                    onChange={(e) => setCurrentDay(e.target.value)}
+                    className="bg-transparent border-none focus:outline-none text-xs font-semibold w-full"
+                  >
+                    {days.map((d) => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
 
             {/* Week / Day Toggles */}
-            <div className="flex items-center gap-4 w-full md:w-auto justify-end">
-              <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl w-full md:w-auto">
-                <button
-                  onClick={() => setView("week")}
-                  className={`flex-1 md:flex-none px-4 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                    view === "week"
-                      ? "bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 shadow-sm"
-                      : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
-                  }`}
-                >
-                  Semana
-                </button>
-                <button
-                  onClick={() => setView("day")}
-                  className={`flex-1 md:flex-none px-4 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                    view === "day"
-                      ? "bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 shadow-sm"
-                      : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
-                  }`}
-                >
-                  Día
-                </button>
+            {viewMode !== "general" && (
+              <div className="flex items-center gap-4 w-full md:w-auto justify-end">
+                <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl w-full md:w-auto">
+                  <button
+                    onClick={() => setView("week")}
+                    className={`flex-1 md:flex-none px-4 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                      view === "week"
+                        ? "bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 shadow-sm"
+                        : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+                    }`}
+                  >
+                    Semana
+                  </button>
+                  <button
+                    onClick={() => setView("day")}
+                    className={`flex-1 md:flex-none px-4 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                      view === "day"
+                        ? "bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 shadow-sm"
+                        : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+                    }`}
+                  >
+                    Día
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* View mode toggle content */}
-          {view === "day" && (
+          {view === "day" && viewMode !== "general" && (
             <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/20 dark:bg-slate-900/40">
               <button
                 onClick={() => {
@@ -486,14 +513,29 @@ export function ScheduleModule() {
             <div className="min-w-[800px]">
               {/* Header */}
               <div
-                className={`grid ${
-                  view === "week" ? "grid-cols-6" : "grid-cols-2"
-                } border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/40`}
+                className={`grid border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/40`}
+                style={{
+                  gridTemplateColumns:
+                    viewMode === "general"
+                      ? `120px repeat(${courses.length}, minmax(160px, 1fr))`
+                      : view === "week"
+                      ? "120px repeat(5, minmax(150px, 1fr))"
+                      : "120px 1fr",
+                }}
               >
                 <div className="p-4 text-center font-bold text-slate-400 dark:text-slate-500 text-xs border-r border-slate-200 dark:border-slate-800 flex items-center justify-center gap-2 uppercase tracking-wider">
                   <Clock className="w-4 h-4 text-slate-400" /> Hora
                 </div>
-                {view === "week" ? (
+                {viewMode === "general" ? (
+                  courses.map((course) => (
+                    <div
+                      key={course.id}
+                      className="p-4 text-center font-bold text-slate-700 dark:text-slate-350 text-xs border-r border-slate-200 dark:border-slate-800 last:border-r-0 uppercase tracking-wider"
+                    >
+                      Grado {course.name}
+                    </div>
+                  ))
+                ) : view === "week" ? (
                   days.map((day) => (
                     <div
                       key={day}
@@ -514,9 +556,15 @@ export function ScheduleModule() {
                 {timeSlots.map((slot, idx) => (
                   <div
                     key={idx}
-                    className={`grid ${
-                      view === "week" ? "grid-cols-6" : "grid-cols-2"
-                    } hover:bg-slate-50/20 dark:hover:bg-slate-850/10 transition-colors`}
+                    className={`grid hover:bg-slate-50/20 dark:hover:bg-slate-850/10 transition-colors`}
+                    style={{
+                      gridTemplateColumns:
+                        viewMode === "general"
+                          ? `120px repeat(${courses.length}, minmax(160px, 1fr))`
+                          : view === "week"
+                          ? "120px repeat(5, minmax(150px, 1fr))"
+                          : "120px 1fr",
+                    }}
                   >
                     {/* Time column */}
                     <div className="p-4 flex flex-col items-center justify-center text-xs font-semibold text-slate-500 dark:text-slate-450 border-r border-slate-200 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-800/10">
@@ -527,28 +575,58 @@ export function ScheduleModule() {
                     {/* Break Row */}
                     {slot.isBreak ? (
                       <div
-                        className={`p-4 bg-slate-50 dark:bg-slate-800/40 flex items-center justify-center text-slate-400 dark:text-slate-500 text-xs font-bold tracking-widest uppercase ${
-                          view === "week" ? "col-span-5" : "col-span-1"
-                        }`}
+                        className={`p-4 bg-slate-50 dark:bg-slate-800/40 flex items-center justify-center text-slate-400 dark:text-slate-500 text-xs font-bold tracking-widest uppercase`}
+                        style={{
+                          gridColumn:
+                            viewMode === "general"
+                              ? `span ${courses.length}`
+                              : view === "week"
+                              ? "span 5"
+                              : "span 1",
+                        }}
                       >
                         <Clock className="w-3.5 h-3.5 mr-2 text-slate-400" />
                         {slot.name}
                       </div>
                     ) : (
                       /* Class Columns */
-                      (view === "week" ? days : [currentDay]).map((day) => {
-                        const classData = getSlotClass(day, slot.time);
+                      (viewMode === "general"
+                        ? courses.map((c) => c.id.toString())
+                        : view === "week"
+                        ? days
+                        : [currentDay]
+                      ).map((colKey) => {
+                        const isGeneral = viewMode === "general";
+                        const day = isGeneral ? currentDay : colKey;
+                        const courseId = isGeneral ? Number(colKey) : undefined;
+                        
+                        let classData;
+                        if (isGeneral) {
+                          classData = schedules.find(
+                            (s) => s.day === day && s.time_slot === slot.time && s.course === courseId
+                          );
+                        } else {
+                          classData = getSlotClass(day, slot.time);
+                        }
 
                         return (
                           <div
-                            key={`${day}-${slot.time}`}
+                            key={`${colKey}-${slot.time}`}
                             className={`p-2 border-r border-slate-200 dark:border-slate-800 last:border-r-0 ${
                               classData ? "" : "bg-slate-50/10 dark:bg-slate-900/10"
                             }`}
                           >
                             {classData ? (
                               <div
-                                onClick={() => handleOpenAssignModal(day, slot.time, classData)}
+                                onClick={() => {
+                                  if (isGeneral) {
+                                    setSelectedCourseId(courseId as number);
+                                    setViewMode("course");
+                                    handleOpenAssignModal(day, slot.time, classData);
+                                  } else {
+                                    handleOpenAssignModal(day, slot.time, classData);
+                                  }
+                                }}
                                 className={`h-full p-3.5 rounded-2xl border ${getSubjectColors(
                                   classData.subject_name
                                 )} flex flex-col justify-between shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer`}
@@ -558,15 +636,15 @@ export function ScheduleModule() {
                                     <h4 className="font-bold text-xs leading-tight mb-1.5">
                                       {classData.subject_name}
                                     </h4>
-                                    {viewMode === "teacher" && (
+                                    {(viewMode === "teacher" || viewMode === "general") && (
                                       <span className="px-1.5 py-0.5 bg-white/60 dark:bg-slate-800/50 rounded-md text-[9px] font-bold border border-black/5 dark:border-white/5">
-                                        {classData.course_name}
+                                        {isGeneral ? classData.teacher_name : classData.course_name}
                                       </span>
                                     )}
                                   </div>
                                   <div className="flex items-center gap-1.5 text-[10px] opacity-80 mb-1">
                                     <User className="w-3 h-3 shrink-0" />
-                                    <span className="truncate">{classData.teacher_name}</span>
+                                    <span className="truncate">{isGeneral ? "Prof." : "" } {classData.teacher_name}</span>
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-1.5 text-[10px] font-semibold opacity-70 mt-2">
@@ -576,7 +654,15 @@ export function ScheduleModule() {
                               </div>
                             ) : (
                               <div
-                                onClick={() => handleOpenAssignModal(day, slot.time)}
+                                onClick={() => {
+                                  if (isGeneral) {
+                                    setSelectedCourseId(courseId as number);
+                                    setViewMode("course");
+                                    handleOpenAssignModal(day, slot.time);
+                                  } else {
+                                    handleOpenAssignModal(day, slot.time);
+                                  }
+                                }}
                                 className="h-full min-h-[90px] border-2 border-dashed border-slate-200 dark:border-slate-800/80 hover:border-blue-500/50 dark:hover:border-blue-500/30 rounded-2xl flex items-center justify-center hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-all cursor-pointer group"
                               >
                                 <span className="text-xs text-slate-400 dark:text-slate-500 font-semibold group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors flex items-center gap-1">

@@ -113,3 +113,83 @@ class TeacherProfileAndAPITests(TenantTestCase):
         response = self.client.delete(self.detail_url)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertFalse(User.objects.filter(id=self.teacher_user.id).exists())
+
+    def test_teacher_availability_validation(self):
+        from apps.curriculum.domain.models import Course, Subject, Area
+        from apps.academics.models import ClassSchedule
+        
+        # Configure availability for self.teacher_user: Lunes from 08:00 to 12:00
+        self.profile.availability = {
+            'Lunes': {'start_time': '08:00', 'end_time': '12:00'}
+        }
+        self.profile.save()
+
+        # Create Area, Course and Subject
+        area = Area.objects.create(name='Matemáticas Avanzadas')
+        course = Course.objects.create(name='6A', level='Secundaria')
+        subject = Subject.objects.create(name='Álgebra', area=area)
+
+        self.client.force_authenticate(user=self.admin)
+        schedule_url = reverse('schedules-list')
+
+        # 1. Invalid schedule (07:00 - 08:00) falls outside (08:00 - 12:00)
+        payload_invalid = {
+            'course': course.id,
+            'day': 'Lunes',
+            'time_slot': '07:00 - 08:00',
+            'subject': subject.id,
+            'teacher': self.teacher_user.id,
+            'room': 'Aula 101'
+        }
+        response = self.client.post(schedule_url, payload_invalid, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('El docente no está disponible en este horario', str(response.data))
+
+        # 2. Valid schedule (08:00 - 09:00) falls inside (08:00 - 12:00)
+        payload_valid = {
+            'course': course.id,
+            'day': 'Lunes',
+            'time_slot': '08:00 - 09:00',
+            'subject': subject.id,
+            'teacher': self.teacher_user.id,
+            'room': 'Aula 101'
+        }
+        response = self.client.post(schedule_url, payload_valid, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_subject_weekly_intensity_validation(self):
+        from apps.curriculum.domain.models import Course, Subject, Area
+        from apps.academics.models import ClassSchedule
+        
+        area = Area.objects.create(name='Ciencias')
+        course = Course.objects.create(name='7A', level='Secundaria')
+        # Create a subject with weekly limit of 1 hour
+        subject = Subject.objects.create(name='Biología', area=area, weekly_hours=1)
+
+        self.client.force_authenticate(user=self.admin)
+        schedule_url = reverse('schedules-list')
+
+        # 1. Create first schedule (valid)
+        payload1 = {
+            'course': course.id,
+            'day': 'Lunes',
+            'time_slot': '08:00 - 09:00',
+            'subject': subject.id,
+            'teacher': self.teacher_user.id,
+            'room': 'Lab'
+        }
+        response1 = self.client.post(schedule_url, payload1, format='json')
+        self.assertEqual(response1.status_code, status.HTTP_201_CREATED)
+
+        # 2. Try to create second schedule (invalid, exceeds weekly limit of 1)
+        payload2 = {
+            'course': course.id,
+            'day': 'Martes',
+            'time_slot': '09:00 - 10:00',
+            'subject': subject.id,
+            'teacher': self.teacher_user.id,
+            'room': 'Lab'
+        }
+        response2 = self.client.post(schedule_url, payload2, format='json')
+        self.assertEqual(response2.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('ya alcanzó su intensidad horaria semanal máxima', str(response2.data))
