@@ -72,3 +72,23 @@ class TeacherSerializer(serializers.ModelSerializer):
         profile.save()
         
         return instance
+
+
+from apps.academics.models import ClassSchedule
+
+class ClassScheduleSerializer(serializers.ModelSerializer):
+    course_name = serializers.CharField(source='course.name', read_only=True)
+    subject_name = serializers.CharField(source='subject.name', read_only=True)
+    teacher_name = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = ClassSchedule
+        fields = (
+            'id', 'course', 'course_name', 'day', 'time_slot', 
+            'subject', 'subject_name', 'teacher', 'teacher_name', 'room'
+        )
+
+    def get_teacher_name(self, obj):
+        name_str = f"{obj.teacher.first_name} {obj.teacher.last_name}".strip()
+        return name_str if name_str else obj.teacher.email
+

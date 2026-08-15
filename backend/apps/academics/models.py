@@ -1,3 +1,3 @@
-from apps.academics.domain.models import TeacherProfile
+from apps.academics.domain.models import TeacherProfile, ClassSchedule
 
-__all__ = ['TeacherProfile']
+__all__ = ['TeacherProfile', 'ClassSchedule']

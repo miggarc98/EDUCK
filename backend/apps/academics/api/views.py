@@ -26,8 +26,64 @@ class TeacherViewSet(viewsets.ModelViewSet):
         if area:
             queryset = queryset.filter(teacher_profile__area__icontains=area)
             
-        status = self.request.query_params.get('status', None)
-        if status:
-            queryset = queryset.filter(teacher_profile__status=status)
-            
         return queryset
+
+
+from apps.academics.models import ClassSchedule
+from apps.academics.api.serializers import ClassScheduleSerializer
+from apps.core.services.audit_service import AuditLogService
+
+class ClassScheduleViewSet(viewsets.ModelViewSet):
+    queryset = ClassSchedule.objects.all().order_by('day', 'time_slot')
+    serializer_class = ClassScheduleSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        course_id = self.request.query_params.get('course')
+        if course_id:
+            queryset = queryset.filter(course_id=course_id)
+        teacher_id = self.request.query_params.get('teacher')
+        if teacher_id:
+            queryset = queryset.filter(teacher_id=teacher_id)
+        day = self.request.query_params.get('day')
+        if day:
+            queryset = queryset.filter(day=day)
+        return queryset
+
+    def perform_create(self, serializer):
+        instance = serializer.save()
+        AuditLogService.log_change(
+            instance=instance,
+            request=self.request,
+            action_type='CREATE',
+            old_snapshot=None,
+            module='institution',
+            entity_name=f"Creado Horario: {instance.course.name} - {instance.day} {instance.time_slot} ({instance.subject.name})"
+        )
+
+    def perform_update(self, serializer):
+        instance = self.get_object()
+        old_snapshot = AuditLogService.serialize_instance(instance)
+        updated_instance = serializer.save()
+        AuditLogService.log_change(
+            instance=updated_instance,
+            request=self.request,
+            action_type='UPDATE',
+            old_snapshot=old_snapshot,
+            module='institution',
+            entity_name=f"Actualizado Horario: {updated_instance.course.name} - {updated_instance.day} {updated_instance.time_slot} ({updated_instance.subject.name})"
+        )
+
+    def perform_destroy(self, instance):
+        old_snapshot = AuditLogService.serialize_instance(instance)
+        AuditLogService.log_change(
+            instance=instance,
+            request=self.request,
+            action_type='DELETE',
+            old_snapshot=old_snapshot,
+            module='institution',
+            entity_name=f"Eliminado Horario: {instance.course.name} - {instance.day} {instance.time_slot} ({instance.subject.name})"
+        )
+        instance.delete()
+

@@ -35,5 +35,49 @@ class TeacherProfile(models.Model):
             self.employee_id = f"DOC-{max_id + 1:03d}"
         super().save(*args, **kwargs)
 
+class ClassSchedule(models.Model):
+    course = models.ForeignKey(
+        'curriculum.Course',
+        on_delete=models.CASCADE,
+        related_name='schedules',
+        help_text="Curso asignado"
+    )
+    day = models.CharField(
+        max_length=20,
+        choices=[
+            ('Lunes', 'Lunes'),
+            ('Martes', 'Martes'),
+            ('Miércoles', 'Miércoles'),
+            ('Jueves', 'Jueves'),
+            ('Viernes', 'Viernes'),
+            ('Sábado', 'Sábado'),
+            ('Domingo', 'Domingo')
+        ]
+    )
+    time_slot = models.CharField(max_length=50, help_text="Rango de hora (ej: 07:00 - 08:00)")
+    subject = models.ForeignKey(
+        'curriculum.Subject',
+        on_delete=models.CASCADE,
+        related_name='schedules',
+        help_text="Asignatura dictada"
+    )
+    teacher = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='schedules',
+        help_text="Docente que dicta la clase"
+    )
+    room = models.CharField(max_length=100, blank=True, default='', help_text="Lugar/Aula (ej: Aula 101)")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'academics_class_schedules'
+        verbose_name = 'Horario de Clase'
+        verbose_name_plural = 'Horarios de Clases'
+        unique_together = ('course', 'day', 'time_slot')
+
     def __str__(self):
-        return f"Perfil de {self.user.email} ({self.employee_id})"
+        return f"{self.course} - {self.day} {self.time_slot}: {self.subject} ({self.room})"
+

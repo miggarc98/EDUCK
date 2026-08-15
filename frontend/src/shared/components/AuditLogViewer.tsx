@@ -60,6 +60,18 @@ const NESTED_FIELD_LABELS: Record<string, string> = {
   "roles_permissions": "Permisos y Roles",
 };
 
+const CURRICULUM_FIELD_LABELS: Record<string, string> = {
+  name: "Nombre",
+  description: "Descripción",
+  is_mandatory: "Obligatorio (Ley 115)",
+  is_active: "Estado Activo",
+  level: "Nivel Académico",
+  degree: "Grado",
+  director: "Director de Grupo (ID)",
+  area: "Área de la Asignatura (ID)",
+  courses: "Cursos Asociados",
+};
+
 interface FlatChangeItem {
   label: string;
   key: string;
@@ -71,10 +83,16 @@ interface FlatChangeItem {
   };
 }
 
-const getFlatChanges = (changes: Record<string, any>): FlatChangeItem[] => {
+const getFlatChanges = (changes: Record<string, any>, entityName = ""): FlatChangeItem[] => {
   const flat: FlatChangeItem[] = [];
   if (!changes) return flat;
   
+  const isCurriculum =
+    entityName.includes("Curso") ||
+    entityName.includes("Área") ||
+    entityName.includes("Asignatura") ||
+    entityName.includes("plan de estudios");
+
   Object.entries(changes).forEach(([fieldKey, change]) => {
     if (
       fieldKey === "settings_json" &&
@@ -160,8 +178,9 @@ const getFlatChanges = (changes: Record<string, any>): FlatChangeItem[] => {
         }
       });
     } else {
+      const labels = isCurriculum ? CURRICULUM_FIELD_LABELS : FIELD_LABELS;
       flat.push({
-        label: FIELD_LABELS[fieldKey] || fieldKey,
+        label: labels[fieldKey] || fieldKey,
         key: fieldKey,
         old: change.old,
         new: change.new,
@@ -339,11 +358,12 @@ export function AuditLogViewer({
         <div className="relative pl-6 space-y-6 before:absolute before:left-2.5 before:top-3 before:bottom-3 before:w-0.5 before:bg-slate-200 dark:before:bg-slate-800">
           {filteredLogs.map((log) => {
             const isExpanded = expandedLogs[log.id] ?? false;
-            const flatChanges = getFlatChanges(log.changes);
+            const flatChanges = getFlatChanges(log.changes, log.entity_name);
             const hasChanges = flatChanges.length > 0;
 
             const isRestore = log.action_type === "RESTORE";
             const isCreate = log.action_type === "CREATE";
+            const isDelete = log.action_type === "DELETE";
 
             return (
               <div key={log.id} className="relative group">
@@ -354,12 +374,14 @@ export function AuditLogViewer({
                       ? "border-purple-500 text-purple-500 shadow-sm shadow-purple-500/20"
                       : isCreate
                       ? "border-emerald-500 text-emerald-500 shadow-sm shadow-emerald-500/20"
+                      : isDelete
+                      ? "border-rose-500 text-rose-500 shadow-sm shadow-rose-500/20"
                       : "border-blue-500 text-blue-500 shadow-sm shadow-blue-500/20"
                   }`}
                 >
                   <div
                     className={`w-2 h-2 rounded-full ${
-                      isRestore ? "bg-purple-500" : isCreate ? "bg-emerald-500" : "bg-blue-500"
+                      isRestore ? "bg-purple-500" : isCreate ? "bg-emerald-500" : isDelete ? "bg-rose-500" : "bg-blue-500"
                     }`}
                   />
                 </div>
@@ -394,11 +416,15 @@ export function AuditLogViewer({
                             ? "bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-800"
                             : isCreate
                             ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800"
+                            : isDelete
+                            ? "bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800"
                             : "bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800"
                         }`}
                       >
                         {isRestore ? (
                           <RotateCcw className="w-3.5 h-3.5" />
+                        ) : isDelete ? (
+                          <AlertTriangle className="w-3.5 h-3.5" />
                         ) : (
                           <UserCheck className="w-3.5 h-3.5" />
                         )}

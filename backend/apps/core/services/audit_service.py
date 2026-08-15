@@ -29,6 +29,8 @@ def json_serialize_value(val):
         return {k: json_serialize_value(v) for k, v in val.items()}
     if isinstance(val, list):
         return [json_serialize_value(v) for v in val]
+    if hasattr(val, 'pk'):
+        return val.pk
     return val
 
 
@@ -41,9 +43,11 @@ class AuditLogService:
         """
         snapshot = {}
         for field in instance._meta.fields:
-            name = field.name
+            # Si el campo es una relación ForeignKey, accedemos al ID directamente (attname)
+            # para evitar serializar el objeto relacionado completo y prevenir consultas SQL adicionales.
+            name = field.attname if isinstance(field, models.ForeignKey) else field.name
             val = getattr(instance, name)
-            snapshot[name] = json_serialize_value(val)
+            snapshot[field.name] = json_serialize_value(val)
         return snapshot
 
     @staticmethod
@@ -122,12 +126,26 @@ class AuditLogService:
         Restaura un modelo a un snapshot de auditoría anterior y registra la acción RESTORE.
         """
         instance = audit_log.content_object
+        is_recreated = False
         if not instance:
             # En caso de que se necesite re-instanciar por ID
             model_cls = audit_log.content_type.model_class()
-            instance = model_cls.objects.get(pk=audit_log.object_id)
+            try:
+                instance = model_cls.objects.get(pk=audit_log.object_id)
+            except model_cls.DoesNotExist:
+                # Si el objeto fue eliminado físicamente, lo instanciamos de nuevo con el mismo ID
+                instance = model_cls()
+                pk_field = model_cls._meta.pk
+                pk_val = audit_log.object_id
+                if isinstance(pk_field, (models.AutoField, models.BigAutoField, models.IntegerField)):
+                    try:
+                        pk_val = int(pk_val)
+                    except ValueError:
+                        pass
+                setattr(instance, pk_field.name, pk_val)
+                is_recreated = True
 
-        old_snapshot = cls.serialize_instance(instance)
+        old_snapshot = cls.serialize_instance(instance) if not is_recreated else {}
         target_snapshot = audit_log.snapshot or {}
 
         # Aplicar valores del snapshot al modelo
@@ -135,7 +153,10 @@ class AuditLogService:
             field_name = field.name
             if field_name in target_snapshot and field_name not in ['id', 'created_at']:
                 val = target_snapshot[field_name]
-                setattr(instance, field_name, val)
+                if isinstance(field, models.ForeignKey):
+                    setattr(instance, field.attname, val)
+                else:
+                    setattr(instance, field_name, val)
 
         instance.save()
 

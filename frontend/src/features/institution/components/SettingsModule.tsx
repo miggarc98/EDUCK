@@ -19,7 +19,7 @@ import {
   INITIAL_LEVEL_GROUPS,
 } from "../constants/institutionDefaults";
 import { InstitutionGeneralTab } from "./tabs/InstitutionGeneralTab";
-import { AcademicConfigTab } from "./tabs/AcademicConfigTab";
+import { AcademicConfigTab, BreakConfig } from "./tabs/AcademicConfigTab";
 import { RolesPermissionsTab } from "./tabs/RolesPermissionsTab";
 import { CurriculumSettingsTab } from "./tabs/CurriculumSettingsTab";
 import { PermissionEditModal } from "./modals/PermissionEditModal";
@@ -223,6 +223,7 @@ export function SettingsModule() {
   const [startTime, setStartTime] = useState("07:00");
   const [endTime, setEndTime] = useState("15:00");
   const [classDuration, setClassDuration] = useState("60 min");
+  const [breaks, setBreaks] = useState<BreakConfig[]>([]);
 
   // Grading System Configuration
   const [generalScale, setGeneralScale] = useState<"numeric_1_5" | "numeric_0_100" | "qualitative" | "national_col">("numeric_1_5");
@@ -282,6 +283,11 @@ export function SettingsModule() {
             })
           );
         }
+        if (data.settings_json?.breaks && Array.isArray(data.settings_json.breaks)) {
+          setBreaks(data.settings_json.breaks);
+        } else {
+          setBreaks([]);
+        }
       }
     } catch (err) {
       console.error("Error al cargar la configuración de la institución:", err);
@@ -290,6 +296,7 @@ export function SettingsModule() {
 
   useEffect(() => {
     loadSettings();
+    curriculumApi.getCourses().then(setCourses).catch(console.error);
   }, [loadSettings]);
 
   const toggleGrade = (levelId: string, gradeId: string) => {
@@ -391,6 +398,7 @@ export function SettingsModule() {
           },
           level_groups: levelGroups,
           roles_permissions: rolesPermissionsMap,
+          breaks: breaks,
         },
       };
 
@@ -543,6 +551,9 @@ export function SettingsModule() {
           changeLevelGradingScale={changeLevelGradingScale}
           toggleGrade={toggleGrade}
           isFormalEducation={isFormalEducation}
+          breaks={breaks}
+          setBreaks={setBreaks}
+          courses={courses}
         />
       )}
 
@@ -559,7 +570,7 @@ export function SettingsModule() {
 
       {/* Tab 3.5: Auditoría de Logs */}
       {activeTab === "history" && (
-        <AuditLogViewer onRestoreSuccess={loadSettings} />
+        <AuditLogViewer onRestoreSuccess={loadSettings} module="" />
       )}
 
       {/* Tab 4: Plan de Estudios */}

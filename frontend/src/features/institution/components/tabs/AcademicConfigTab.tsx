@@ -1,6 +1,14 @@
 import React from "react";
-import { Calendar, Award, Layers, Check, X } from "lucide-react";
+import { Calendar, Award, Layers, Check, X, Clock, Plus, Trash2 } from "lucide-react";
 import type { LevelGroup } from "../../constants/institutionDefaults";
+import type { Course } from "@/features/curriculum/types";
+
+export interface BreakConfig {
+  name: string;
+  start_time: string;
+  end_time: string;
+  courses: number[];
+}
 
 interface AcademicConfigTabProps {
   academicYear: string;
@@ -25,6 +33,9 @@ interface AcademicConfigTabProps {
   changeLevelGradingScale: (levelId: string, scale: string) => void;
   toggleGrade: (levelId: string, gradeId: string) => void;
   isFormalEducation: boolean;
+  breaks: BreakConfig[];
+  setBreaks: React.Dispatch<React.SetStateAction<BreakConfig[]>>;
+  courses: Course[];
 }
 
 export function AcademicConfigTab({
@@ -50,7 +61,68 @@ export function AcademicConfigTab({
   changeLevelGradingScale,
   toggleGrade,
   isFormalEducation,
+  breaks,
+  setBreaks,
+  courses,
 }: AcademicConfigTabProps) {
+  const handleAddBreak = () => {
+    setBreaks((prev) => [
+      ...prev,
+      { name: `Descanso ${prev.length + 1}`, start_time: "10:00", end_time: "10:30", courses: [] }
+    ]);
+  };
+
+  const handleRemoveBreak = (idx: number) => {
+    setBreaks((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleUpdateBreak = (idx: number, key: string, val: any) => {
+    setBreaks((prev) =>
+      prev.map((b, i) => (i === idx ? { ...b, [key]: val } : b))
+    );
+  };
+
+  const handleToggleCourseForBreak = (breakIdx: number, courseId: number) => {
+    setBreaks((prev) =>
+      prev.map((b, i) => {
+        if (i === breakIdx) {
+          const exists = b.courses.includes(courseId);
+          const newCourses = exists
+            ? b.courses.filter((id) => id !== courseId)
+            : [...b.courses, courseId];
+          return { ...b, courses: newCourses };
+        }
+        return b;
+      })
+    );
+  };
+
+  const handleSelectAllCoursesForBreak = (breakIdx: number) => {
+    setBreaks((prev) =>
+      prev.map((b, i) => (i === breakIdx ? { ...b, courses: courses.map((c) => c.id) } : b))
+    );
+  };
+
+  const handleClearCoursesForBreak = (breakIdx: number) => {
+    setBreaks((prev) =>
+      prev.map((b, i) => (i === breakIdx ? { ...b, courses: [] } : b))
+    );
+  };
+
+  const handleSelectLevelCoursesForBreak = (breakIdx: number, levelKeyword: string) => {
+    const targetCourseIds = courses
+      .filter((c) => c.level.toLowerCase().includes(levelKeyword))
+      .map((c) => c.id);
+    setBreaks((prev) =>
+      prev.map((b, i) => {
+        if (i === breakIdx) {
+          const merged = Array.from(new Set([...b.courses, ...targetCourseIds]));
+          return { ...b, courses: merged };
+        }
+        return b;
+      })
+    );
+  };
   return (
     <div className="space-y-6">
       {/* 2. Calendario y Periodos Académicos */}
@@ -385,6 +457,153 @@ export function AcademicConfigTab({
             </div>
           ))}
         </div>
+      </section>
+
+      {/* 2.5 Configuración de Descansos */}
+      <section className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 p-6 transition-colors">
+        <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100 dark:border-slate-800">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
+              <Clock className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">
+                Descansos y Recesos Segmentados
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Configura recreos granulares y asígnalos a cursos específicos (ej. primaria en primer turno, bachillerato después)
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleAddBreak}
+            className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-blue-600/10"
+          >
+            <Plus className="w-4 h-4" />
+            Agregar Descanso
+          </button>
+        </div>
+
+        {breaks.length === 0 ? (
+          <div className="text-center py-8 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
+            <Clock className="w-8 h-8 text-slate-350 mx-auto mb-2" />
+            <p className="text-sm font-medium text-slate-500">No hay descansos configurados</p>
+            <p className="text-xs text-slate-400 mt-0.5">Los cursos tendrán una jornada continua sin pausas si no configuras descansos.</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {breaks.map((br, index) => (
+              <div key={index} className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-200 dark:border-slate-800 relative space-y-4 animate-in fade-in duration-200">
+                <button
+                  type="button"
+                  onClick={() => handleRemoveBreak(index)}
+                  className="absolute top-4 right-4 p-1.5 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pr-10">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      Nombre del Descanso
+                    </label>
+                    <input
+                      type="text"
+                      value={br.name}
+                      onChange={(e) => handleUpdateBreak(index, "name", e.target.value)}
+                      placeholder="ej: Descanso Primaria"
+                      className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-800 dark:text-slate-100"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      Hora de Inicio
+                    </label>
+                    <input
+                      type="time"
+                      value={br.start_time}
+                      onChange={(e) => handleUpdateBreak(index, "start_time", e.target.value)}
+                      className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-800 dark:text-slate-100"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      Hora de Fin
+                    </label>
+                    <input
+                      type="time"
+                      value={br.end_time}
+                      onChange={(e) => handleUpdateBreak(index, "end_time", e.target.value)}
+                      className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-800 dark:text-slate-100"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 font-semibold">
+                      Cursos Asignados
+                    </label>
+                    <div className="flex gap-2 text-[10px]">
+                      <button
+                        type="button"
+                        onClick={() => handleSelectAllCoursesForBreak(index)}
+                        className="font-bold text-blue-600 hover:text-blue-700 hover:underline"
+                      >
+                        Todos
+                      </button>
+                      <span className="text-slate-400">|</span>
+                      <button
+                        type="button"
+                        onClick={() => handleSelectLevelCoursesForBreak(index, "primaria")}
+                        className="font-bold text-blue-600 hover:text-blue-700 hover:underline"
+                      >
+                        Primaria
+                      </button>
+                      <span className="text-slate-400">|</span>
+                      <button
+                        type="button"
+                        onClick={() => handleSelectLevelCoursesForBreak(index, "secundaria")}
+                        className="font-bold text-blue-600 hover:text-blue-700 hover:underline"
+                      >
+                        Secundaria y Media
+                      </button>
+                      <span className="text-slate-400">|</span>
+                      <button
+                        type="button"
+                        onClick={() => handleClearCoursesForBreak(index)}
+                        className="font-bold text-rose-500 hover:text-rose-600 hover:underline"
+                      >
+                        Limpiar
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="flex flex-wrap gap-2 p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl">
+                    {courses.map((course) => {
+                      const isSelected = br.courses.includes(course.id);
+                      return (
+                        <button
+                          key={course.id}
+                          type="button"
+                          onClick={() => handleToggleCourseForBreak(index, course.id)}
+                          className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all border ${
+                            isSelected
+                              ? "bg-blue-50 dark:bg-blue-950/45 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800/80"
+                              : "bg-slate-50 dark:bg-slate-850 text-slate-500 dark:text-slate-400 border-slate-100 dark:border-slate-800/60 hover:border-slate-350"
+                          }`}
+                        >
+                          {course.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
     </div>
   );

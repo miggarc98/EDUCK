@@ -45,9 +45,6 @@ export function Sidebar({
     { id: "discipline", icon: ShieldAlert, label: "Convivencia" },
     { id: "reporting", icon: FileBarChart, label: "Reportes" },
     { id: "communications", icon: MessageSquare, label: "Comunicaciones" },
-    { id: "settings", icon: Settings, label: "Configuración" },
-    { id: "mobile", icon: Smartphone, label: "Modo Offline (App)" },
-    { id: "test404", icon: FileQuestion, label: "Test 404" },
   ];
 
   return (

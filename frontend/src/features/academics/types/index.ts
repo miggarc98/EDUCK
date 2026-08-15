@@ -10,3 +10,25 @@ export interface CreateTeacherPayload {
   status?: 'active' | 'on_leave';
   password?: string;
 }
+
+export interface ClassSchedule {
+  id: number;
+  course: number;
+  course_name: string;
+  day: string;
+  time_slot: string;
+  subject: number;
+  subject_name: string;
+  teacher: number;
+  teacher_name: string;
+  room: string;
+}
+
+export interface CreateClassSchedulePayload {
+  course: number;
+  day: string;
+  time_slot: string;
+  subject: number;
+  teacher: number;
+  room: string;
+}

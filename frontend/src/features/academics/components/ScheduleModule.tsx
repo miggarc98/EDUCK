@@ -1,0 +1,755 @@
+import { useState, useEffect } from "react";
+import {
+  Calendar as CalendarIcon,
+  Clock,
+  ChevronLeft,
+  ChevronRight,
+  User,
+  MapPin,
+  Plus,
+  Trash2,
+  X,
+  RefreshCw,
+} from "lucide-react";
+import { academicsApi } from "../services/api";
+import { curriculumApi } from "@/features/curriculum/services/api";
+import { institutionApi } from "@/features/institution/services/api";
+import type { Course, Subject } from "@/features/curriculum/types";
+import type { Teacher, ClassSchedule } from "../types";
+import type { InstitutionSettingData } from "@/features/institution/types";
+
+const days = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"];
+
+// Helper to parse "HH:MM" to minutes from midnight
+const parseTimeToMinutes = (timeStr: string): number => {
+  if (!timeStr) return 0;
+  const [hours, minutes] = timeStr.split(":").map(Number);
+  return hours * 60 + minutes;
+};
+
+// Helper to format minutes from midnight to "HH:MM"
+const formatMinutesToTime = (totalMinutes: number): string => {
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+};
+
+// Predefined colors for premium design
+const getSubjectColors = (subjectName: string) => {
+  const name = subjectName.toLowerCase();
+  if (name.includes("matemát") || name.includes("cálcul") || name.includes("trigono")) {
+    return "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800/80";
+  }
+  if (name.includes("español") || name.includes("lengua") || name.includes("literatura")) {
+    return "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800/80";
+  }
+  if (name.includes("ciencias") || name.includes("biolog") || name.includes("físic") || name.includes("químic") || name.includes("natural")) {
+    return "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/80";
+  }
+  if (name.includes("inglés") || name.includes("idioma") || name.includes("english")) {
+    return "bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800/80";
+  }
+  if (name.includes("sociales") || name.includes("historia") || name.includes("geograf") || name.includes("constitu")) {
+    return "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800/80";
+  }
+  if (name.includes("física") || name.includes("deporte") || name.includes("recrea")) {
+    return "bg-orange-50 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800/80";
+  }
+  if (name.includes("arte") || name.includes("música") || name.includes("danza") || name.includes("artístic")) {
+    return "bg-fuchsia-50 dark:bg-fuchsia-950/40 text-fuchsia-700 dark:text-fuchsia-300 border-fuchsia-200 dark:border-fuchsia-800/80";
+  }
+  if (name.includes("tecnolog") || name.includes("sistemas") || name.includes("computa") || name.includes("informát")) {
+    return "bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300 border-cyan-200 dark:border-cyan-800/80";
+  }
+  if (name.includes("ética") || name.includes("valores") || name.includes("religión") || name.includes("filosof")) {
+    return "bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800/80";
+  }
+  if (name.includes("dirección") || name.includes("grupo") || name.includes("orienta")) {
+    return "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700";
+  }
+  return "bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700/80";
+};
+
+interface TimeSlot {
+  time: string;
+  isBreak: boolean;
+  name?: string;
+}
+
+export function ScheduleModule() {
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [schedules, setSchedules] = useState<ClassSchedule[]>([]);
+  const [settings, setSettings] = useState<InstitutionSettingData | null>(null);
+
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Filters & State
+  const [viewMode, setViewMode] = useState<"course" | "teacher">("course");
+  const [selectedCourseId, setSelectedCourseId] = useState<number | "">("");
+  const [selectedTeacherId, setSelectedTeacherId] = useState<number | "">("");
+  const [view, setView] = useState<"week" | "day">("week");
+  const [currentDay, setCurrentDay] = useState("Lunes");
+  const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
+
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingSchedule, setEditingSchedule] = useState<ClassSchedule | null>(null);
+  const [modalDay, setModalDay] = useState("");
+  const [modalTimeSlot, setModalTimeSlot] = useState("");
+  const [modalSubjectId, setModalSubjectId] = useState<number | "">("");
+  const [modalTeacherId, setModalTeacherId] = useState<number | "">("");
+  const [modalRoom, setModalRoom] = useState("");
+  const [modalError, setModalError] = useState<string | null>(null);
+
+  // Load all foundational data
+  const loadData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [coursesData, teachersData, subjectsData, settingsData, schedulesData] = await Promise.all([
+        curriculumApi.getCourses(),
+        academicsApi.getTeachers(),
+        curriculumApi.getSubjects(),
+        institutionApi.getSettings(),
+        academicsApi.getSchedules(),
+      ]);
+
+      setCourses(coursesData);
+      setTeachers(teachersData);
+      setSubjects(subjectsData);
+      setSettings(settingsData);
+      setSchedules(schedulesData);
+
+      // Set default course selection if available
+      if (coursesData.length > 0) {
+        setSelectedCourseId(coursesData[0].id);
+      }
+      if (teachersData.length > 0) {
+        setSelectedTeacherId(teachersData[0].id);
+      }
+
+      // Generate timeslots from settings
+      generateSlots(settingsData, coursesData.length > 0 ? coursesData[0].id : "");
+    } catch (err: any) {
+      console.error("Error loading schedule data:", err);
+      setError("No se pudo cargar la información de horarios. Por favor, intente nuevamente.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  // Compute timeslots based on settings
+  const generateSlots = (instSettings: InstitutionSettingData, courseId: number | "") => {
+    const startTimeStr = instSettings.start_time || "07:00";
+    const endTimeStr = instSettings.end_time || "14:30";
+    const duration = instSettings.block_duration_minutes || 45;
+
+    const startMinutes = parseTimeToMinutes(startTimeStr);
+    const endMinutes = parseTimeToMinutes(endTimeStr);
+
+    // Get breaks that apply to this course
+    const courseBreaks = (instSettings.settings_json?.breaks || []).filter(
+      (b: any) => Array.isArray(b.courses) && b.courses.includes(Number(courseId))
+    );
+
+    const slots: TimeSlot[] = [];
+    let current = startMinutes;
+    let safetyCounter = 0;
+
+    while (current + 5 < endMinutes) {
+      safetyCounter++;
+      if (safetyCounter > 100) break; // Prevent infinite loops
+
+      // Check if there is a break starting exactly now, or overlapping
+      const activeBreak = courseBreaks.find((b: any) => {
+        const bStart = parseTimeToMinutes(b.start_time);
+        return current >= bStart && current < parseTimeToMinutes(b.end_time);
+      });
+
+      if (activeBreak) {
+        const bStart = parseTimeToMinutes(activeBreak.start_time);
+        const bEnd = parseTimeToMinutes(activeBreak.end_time);
+        slots.push({
+          time: `${formatMinutesToTime(bStart)} - ${formatMinutesToTime(bEnd)}`,
+          isBreak: true,
+          name: activeBreak.name || "Descanso",
+        });
+        current = bEnd;
+        continue;
+      }
+
+      // Otherwise, add a regular class block
+      const next = current + duration;
+      if (next <= endMinutes) {
+        const overlappingBreak = courseBreaks.find((b: any) => {
+          const bStart = parseTimeToMinutes(b.start_time);
+          return bStart > current && bStart < next;
+        });
+
+        if (overlappingBreak) {
+          const bStart = parseTimeToMinutes(overlappingBreak.start_time);
+          slots.push({
+            time: `${formatMinutesToTime(current)} - ${formatMinutesToTime(bStart)}`,
+            isBreak: false,
+          });
+          current = bStart;
+        } else {
+          slots.push({
+            time: `${formatMinutesToTime(current)} - ${formatMinutesToTime(next)}`,
+            isBreak: false,
+          });
+          current = next;
+        }
+      } else {
+        slots.push({
+          time: `${formatMinutesToTime(current)} - ${formatMinutesToTime(endMinutes)}`,
+          isBreak: false,
+        });
+        break;
+      }
+    }
+    setTimeSlots(slots);
+  };
+
+  useEffect(() => {
+    if (settings) {
+      if (viewMode === "course") {
+        generateSlots(settings, selectedCourseId);
+      } else {
+        generateSlots(settings, "");
+      }
+    }
+  }, [settings, selectedCourseId, viewMode]);
+
+  const getSlotClass = (day: string, time: string) => {
+    if (viewMode === "course") {
+      return schedules.find(
+        (s) => s.day === day && s.time_slot === time && s.course === selectedCourseId
+      );
+    } else {
+      return schedules.find(
+        (s) => s.day === day && s.time_slot === time && s.teacher === selectedTeacherId
+      );
+    }
+  };
+
+  // Open modal to assign or edit class
+  const handleOpenAssignModal = (day: string, timeSlot: string, existingSchedule?: ClassSchedule) => {
+    setModalError(null);
+    setModalDay(day);
+    setModalTimeSlot(timeSlot);
+
+    if (existingSchedule) {
+      setEditingSchedule(existingSchedule);
+      setModalSubjectId(existingSchedule.subject);
+      setModalTeacherId(existingSchedule.teacher);
+      setModalRoom(existingSchedule.room || "");
+    } else {
+      setEditingSchedule(null);
+      setModalSubjectId("");
+      setModalTeacherId("");
+      setModalRoom("");
+    }
+    setIsModalOpen(true);
+  };
+
+  // Save changes
+  const handleSaveSchedule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!modalSubjectId || !modalTeacherId || (viewMode === "course" && !selectedCourseId) || (viewMode === "teacher" && !selectedTeacherId)) {
+      setModalError("Por favor complete todos los campos obligatorios.");
+      return;
+    }
+
+    setSaving(true);
+    setModalError(null);
+
+    const courseId = viewMode === "course" ? (selectedCourseId as number) : (editingSchedule?.course || 0);
+    
+    // In teacher view, we also need a course
+    let targetCourseId = courseId;
+    if (viewMode === "teacher" && !editingSchedule) {
+      // Find course from form selection or first course as fallback
+      if (courses.length > 0) {
+        targetCourseId = courses[0].id;
+      } else {
+        setModalError("Debe existir al menos un curso académico creado.");
+        setSaving(false);
+        return;
+      }
+    }
+
+    const payload = {
+      course: targetCourseId,
+      day: modalDay,
+      time_slot: modalTimeSlot,
+      subject: Number(modalSubjectId),
+      teacher: Number(modalTeacherId),
+      room: modalRoom,
+    };
+
+    try {
+      if (editingSchedule) {
+        const updated = await academicsApi.updateSchedule(editingSchedule.id, payload);
+        setSchedules((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+      } else {
+        const created = await academicsApi.createSchedule(payload);
+        setSchedules((prev) => [...prev, created]);
+      }
+      setIsModalOpen(false);
+    } catch (err: any) {
+      console.error("Error saving schedule:", err);
+      const detail = err?.response?.data?.detail || err?.response?.data?.non_field_errors?.[0] || "No se pudo guardar la asignación. Verifique que no exista conflicto de horario.";
+      setModalError(detail);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Delete assignment
+  const handleDeleteSchedule = async () => {
+    if (!editingSchedule) return;
+    if (!confirm("¿Está seguro de eliminar esta clase asignada del horario?")) return;
+
+    setSaving(true);
+    try {
+      await academicsApi.deleteSchedule(editingSchedule.id);
+      setSchedules((prev) => prev.filter((s) => s.id !== editingSchedule.id));
+      setIsModalOpen(false);
+    } catch (err: any) {
+      console.error("Error deleting schedule:", err);
+      setModalError("Ocurrió un error al intentar eliminar la asignación.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="max-w-7xl mx-auto pb-12 relative animate-in fade-in duration-300">
+      <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2.5">
+            <CalendarIcon className="w-6 h-6 text-blue-600 dark:text-blue-500" />
+            Horarios Académicos
+          </h1>
+          <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
+            Gestiona y visualiza la asignación de clases por curso o docente para {settings?.institution_name || "la institución"}.
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={loadData}
+            disabled={loading}
+            className="flex items-center justify-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors shadow-sm disabled:opacity-50"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+            <span>Actualizar</span>
+          </button>
+        </div>
+      </div>
+
+      {error && (
+        <div className="mb-6 p-4 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-sm font-medium flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-rose-600" />
+          {error}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="p-20 text-center bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+          <RefreshCw className="w-10 h-10 animate-spin mx-auto text-blue-600 mb-4" />
+          <p className="text-slate-600 dark:text-slate-400 font-medium">Cargando módulos de horarios y configuraciones...</p>
+        </div>
+      ) : (
+        <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
+          {/* Toolbar */}
+          <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex flex-col md:flex-row gap-5 justify-between items-center bg-slate-50/50 dark:bg-slate-800/30">
+            {/* Filter Toggle */}
+            <div className="flex items-center gap-4 w-full md:w-auto">
+              <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl">
+                <button
+                  onClick={() => setViewMode("course")}
+                  className={`px-4 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                    viewMode === "course"
+                      ? "bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 shadow-sm"
+                      : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+                  }`}
+                >
+                  Por Curso
+                </button>
+                <button
+                  onClick={() => setViewMode("teacher")}
+                  className={`px-4 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                    viewMode === "teacher"
+                      ? "bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 shadow-sm"
+                      : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+                  }`}
+                >
+                  Por Docente
+                </button>
+              </div>
+
+              {/* Selector according to ViewMode */}
+              {viewMode === "course" ? (
+                <select
+                  value={selectedCourseId}
+                  onChange={(e) => setSelectedCourseId(Number(e.target.value))}
+                  className="bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-700 text-slate-750 dark:text-slate-150 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {courses.map((course) => (
+                    <option key={course.id} value={course.id}>
+                      Grado {course.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <select
+                  value={selectedTeacherId}
+                  onChange={(e) => setSelectedTeacherId(Number(e.target.value))}
+                  className="bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-700 text-slate-750 dark:text-slate-150 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {teachers.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.first_name} {t.last_name} ({t.area || "Docente"})
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            {/* Week / Day Toggles */}
+            <div className="flex items-center gap-4 w-full md:w-auto justify-end">
+              <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl w-full md:w-auto">
+                <button
+                  onClick={() => setView("week")}
+                  className={`flex-1 md:flex-none px-4 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                    view === "week"
+                      ? "bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 shadow-sm"
+                      : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+                  }`}
+                >
+                  Semana
+                </button>
+                <button
+                  onClick={() => setView("day")}
+                  className={`flex-1 md:flex-none px-4 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                    view === "day"
+                      ? "bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 shadow-sm"
+                      : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+                  }`}
+                >
+                  Día
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* View mode toggle content */}
+          {view === "day" && (
+            <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50/20 dark:bg-slate-900/40">
+              <button
+                onClick={() => {
+                  const idx = days.indexOf(currentDay);
+                  if (idx > 0) setCurrentDay(days[idx - 1]);
+                }}
+                disabled={days.indexOf(currentDay) === 0}
+                className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 disabled:opacity-30 border border-slate-200 dark:border-slate-800 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <h2 className="text-sm font-bold text-slate-800 dark:text-slate-100 tracking-wide uppercase">
+                {currentDay}
+              </h2>
+              <button
+                onClick={() => {
+                  const idx = days.indexOf(currentDay);
+                  if (idx < days.length - 1) setCurrentDay(days[idx + 1]);
+                }}
+                disabled={days.indexOf(currentDay) === days.length - 1}
+                className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 disabled:opacity-30 border border-slate-200 dark:border-slate-800 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          {/* Schedule Grid */}
+          <div className="overflow-x-auto">
+            <div className="min-w-[800px]">
+              {/* Header */}
+              <div
+                className={`grid ${
+                  view === "week" ? "grid-cols-6" : "grid-cols-2"
+                } border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/40`}
+              >
+                <div className="p-4 text-center font-bold text-slate-400 dark:text-slate-500 text-xs border-r border-slate-200 dark:border-slate-800 flex items-center justify-center gap-2 uppercase tracking-wider">
+                  <Clock className="w-4 h-4 text-slate-400" /> Hora
+                </div>
+                {view === "week" ? (
+                  days.map((day) => (
+                    <div
+                      key={day}
+                      className="p-4 text-center font-bold text-slate-700 dark:text-slate-350 text-xs border-r border-slate-200 dark:border-slate-800 last:border-r-0 uppercase tracking-wider"
+                    >
+                      {day}
+                    </div>
+                  ))
+                ) : (
+                  <div className="p-4 text-center font-bold text-slate-700 dark:text-slate-350 text-xs border-r-0 uppercase tracking-wider">
+                    {currentDay}
+                  </div>
+                )}
+              </div>
+
+              {/* Body */}
+              <div className="divide-y divide-slate-200 dark:divide-slate-800">
+                {timeSlots.map((slot, idx) => (
+                  <div
+                    key={idx}
+                    className={`grid ${
+                      view === "week" ? "grid-cols-6" : "grid-cols-2"
+                    } hover:bg-slate-50/20 dark:hover:bg-slate-850/10 transition-colors`}
+                  >
+                    {/* Time column */}
+                    <div className="p-4 flex flex-col items-center justify-center text-xs font-semibold text-slate-500 dark:text-slate-450 border-r border-slate-200 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-800/10">
+                      <span className="text-slate-800 dark:text-slate-300 font-bold">{slot.time}</span>
+                      <span className="text-[10px] font-normal text-slate-400 mt-0.5">Módulo {idx + 1}</span>
+                    </div>
+
+                    {/* Break Row */}
+                    {slot.isBreak ? (
+                      <div
+                        className={`p-4 bg-slate-50 dark:bg-slate-800/40 flex items-center justify-center text-slate-400 dark:text-slate-500 text-xs font-bold tracking-widest uppercase ${
+                          view === "week" ? "col-span-5" : "col-span-1"
+                        }`}
+                      >
+                        <Clock className="w-3.5 h-3.5 mr-2 text-slate-400" />
+                        {slot.name}
+                      </div>
+                    ) : (
+                      /* Class Columns */
+                      (view === "week" ? days : [currentDay]).map((day) => {
+                        const classData = getSlotClass(day, slot.time);
+
+                        return (
+                          <div
+                            key={`${day}-${slot.time}`}
+                            className={`p-2 border-r border-slate-200 dark:border-slate-800 last:border-r-0 ${
+                              classData ? "" : "bg-slate-50/10 dark:bg-slate-900/10"
+                            }`}
+                          >
+                            {classData ? (
+                              <div
+                                onClick={() => handleOpenAssignModal(day, slot.time, classData)}
+                                className={`h-full p-3.5 rounded-2xl border ${getSubjectColors(
+                                  classData.subject_name
+                                )} flex flex-col justify-between shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer`}
+                              >
+                                <div>
+                                  <div className="flex justify-between items-start">
+                                    <h4 className="font-bold text-xs leading-tight mb-1.5">
+                                      {classData.subject_name}
+                                    </h4>
+                                    {viewMode === "teacher" && (
+                                      <span className="px-1.5 py-0.5 bg-white/60 dark:bg-slate-800/50 rounded-md text-[9px] font-bold border border-black/5 dark:border-white/5">
+                                        {classData.course_name}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-1.5 text-[10px] opacity-80 mb-1">
+                                    <User className="w-3 h-3 shrink-0" />
+                                    <span className="truncate">{classData.teacher_name}</span>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-1.5 text-[10px] font-semibold opacity-70 mt-2">
+                                  <MapPin className="w-3 h-3 shrink-0" />
+                                  <span className="truncate">{classData.room || "Aula N/A"}</span>
+                                </div>
+                              </div>
+                            ) : (
+                              <div
+                                onClick={() => handleOpenAssignModal(day, slot.time)}
+                                className="h-full min-h-[90px] border-2 border-dashed border-slate-200 dark:border-slate-800/80 hover:border-blue-500/50 dark:hover:border-blue-500/30 rounded-2xl flex items-center justify-center hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-all cursor-pointer group"
+                              >
+                                <span className="text-xs text-slate-400 dark:text-slate-500 font-semibold group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors flex items-center gap-1">
+                                  <Plus className="w-3.5 h-3.5" /> Asignar
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Assign Class Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-md w-full p-6 border border-slate-200 dark:border-slate-800 shadow-xl space-y-4 animate-in fade-in zoom-in-95 duration-150 text-xs">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-850 dark:text-slate-100 flex items-center gap-2">
+                <CalendarIcon className="w-4 h-4 text-blue-500" />
+                {editingSchedule ? "Modificar Clase Asignada" : "Asignar Nueva Clase"}
+              </h3>
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-3.5 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200/50 dark:border-slate-700/50 flex flex-wrap gap-x-4 gap-y-1.5 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+              <div>
+                Día: <strong className="text-slate-800 dark:text-slate-200">{modalDay}</strong>
+              </div>
+              <div>
+                Horario: <strong className="text-slate-800 dark:text-slate-200">{modalTimeSlot}</strong>
+              </div>
+              {viewMode === "course" && selectedCourseId && (
+                <div>
+                  Curso: <strong className="text-slate-800 dark:text-slate-200">
+                    {courses.find((c) => c.id === selectedCourseId)?.name}
+                  </strong>
+                </div>
+              )}
+            </div>
+
+            {modalError && (
+              <div className="p-3 bg-rose-50 dark:bg-rose-950/20 text-rose-700 dark:text-rose-350 rounded-xl border border-rose-100 dark:border-rose-900/50 font-medium">
+                {modalError}
+              </div>
+            )}
+
+            <form onSubmit={handleSaveSchedule} className="space-y-4">
+              {/* Course Selection (Only when viewing/editing by Teacher to assign a Course) */}
+              {viewMode === "teacher" && !editingSchedule && (
+                <div className="space-y-1">
+                  <label className="block font-semibold text-slate-650 dark:text-slate-350">
+                    Curso Académico *
+                  </label>
+                  <select
+                    required
+                    value={selectedCourseId}
+                    onChange={(e) => setSelectedCourseId(Number(e.target.value))}
+                    className="w-full bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-750 text-slate-800 dark:text-slate-150 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Seleccione un curso...</option>
+                    {courses.map((course) => (
+                      <option key={course.id} value={course.id}>
+                        Grado {course.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Subject */}
+              <div className="space-y-1">
+                <label className="block font-semibold text-slate-650 dark:text-slate-350">
+                  Asignatura *
+                </label>
+                <select
+                  required
+                  value={modalSubjectId}
+                  onChange={(e) => setModalSubjectId(Number(e.target.value))}
+                  className="w-full bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-750 text-slate-800 dark:text-slate-150 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Seleccione la asignatura...</option>
+                  {subjects.map((sub) => (
+                    <option key={sub.id} value={sub.id}>
+                      {sub.name} ({sub.area_detail?.name || "Currículo"})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Teacher */}
+              <div className="space-y-1">
+                <label className="block font-semibold text-slate-650 dark:text-slate-350">
+                  Docente Responsable *
+                </label>
+                <select
+                  required
+                  value={modalTeacherId}
+                  onChange={(e) => setModalTeacherId(Number(e.target.value))}
+                  className="w-full bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-750 text-slate-800 dark:text-slate-150 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Seleccione el docente...</option>
+                  {teachers.map((teach) => (
+                    <option key={teach.id} value={teach.id}>
+                      {teach.first_name} {teach.last_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Room / Classroom */}
+              <div className="space-y-1">
+                <label className="block font-semibold text-slate-650 dark:text-slate-350">
+                  Aula / Lugar físico (Opcional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="ej: Aula 101, Lab 1, Biblioteca"
+                  value={modalRoom}
+                  onChange={(e) => setModalRoom(e.target.value)}
+                  className="w-full bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-750 text-slate-800 dark:text-slate-150 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-between pt-3 gap-2">
+                {editingSchedule ? (
+                  <button
+                    type="button"
+                    onClick={handleDeleteSchedule}
+                    disabled={saving}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-xl transition-all border border-rose-200 disabled:opacity-50"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Eliminar</span>
+                  </button>
+                ) : (
+                  <div />
+                )}
+
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsModalOpen(false)}
+                    disabled={saving}
+                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-all disabled:opacity-50"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className="flex items-center gap-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-all shadow-md shadow-blue-600/20 disabled:opacity-50"
+                  >
+                    {saving ? "Guardando..." : "Guardar Cambios"}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
