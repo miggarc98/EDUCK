@@ -12,7 +12,9 @@ class InstitutionSettingSerializer(serializers.ModelSerializer):
             'phone',
             'email',
             'logo_url',
+            'is_formal_education',
             'academic_year',
+
             'active_period',
             'start_time',
             'end_time',

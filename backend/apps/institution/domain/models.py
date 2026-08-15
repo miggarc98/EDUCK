@@ -36,6 +36,8 @@ class InstitutionSetting(models.Model):
     phone = models.CharField(max_length=50, blank=True, default='')
     email = models.EmailField(blank=True, default='')
     logo_url = models.TextField(blank=True, default='')
+    is_formal_education = models.BooleanField(default=True, help_text="Educación Formal Ley 115 / PEI")
+
 
     # Configuración académica
     academic_year = models.IntegerField(default=2024)

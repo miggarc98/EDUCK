@@ -27,7 +27,14 @@ import {
   CheckSquare,
   Square,
   Info,
+  BookOpen,
+  Edit,
+  Trash,
+  MoreHorizontal,
 } from "lucide-react";
+import { curriculumApi } from "@/features/curriculum/services/api";
+import type { Area, Subject, Course } from "@/features/curriculum/types";
+
 
 interface GradeItem {
   id: string;
@@ -124,10 +131,168 @@ const PERMISSION_CATALOG: PermissionCategory[] = [
 ];
 
 export function SettingsModule() {
-  const [activeTab, setActiveTab] = useState<"institution" | "account" | "history">(
+  const [activeTab, setActiveTab] = useState<"institution" | "account" | "history" | "curriculum">(
     "institution"
   );
   const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(null);
+
+  // --- Curriculum (Areas and Subjects) States ---
+  const [areas, setAreas] = useState<Area[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [curriculumLoading, setCurriculumLoading] = useState(false);
+  const [searchAreaTerm, setSearchAreaTerm] = useState("");
+  const [searchSubjectTerm, setSearchSubjectTerm] = useState("");
+  const [filterSubjectArea, setFilterSubjectArea] = useState("");
+
+  // Area Modal states
+  const [isAreaModalOpen, setIsAreaModalOpen] = useState(false);
+  const [editingArea, setEditingArea] = useState<Area | null>(null);
+  const [areaName, setAreaName] = useState("");
+  const [areaDescription, setAreaDescription] = useState("");
+
+  // Subject Modal states
+  const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false);
+  const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
+  const [subjectName, setSubjectName] = useState("");
+  const [subjectDescription, setSubjectDescription] = useState("");
+  const [subjectAreaId, setSubjectAreaId] = useState("");
+  const [subjectCourses, setSubjectCourses] = useState<number[]>([]);
+
+  // Dropdown/Menu toggles
+  const [activeAreaDropdown, setActiveAreaDropdown] = useState<number | null>(null);
+  const [activeSubjectDropdown, setActiveSubjectDropdown] = useState<number | null>(null);
+
+  const loadCurriculumData = async () => {
+    setCurriculumLoading(true);
+    try {
+      const [areasData, subjectsData, coursesData] = await Promise.all([
+        curriculumApi.getAreas(),
+        curriculumApi.getSubjects(),
+        curriculumApi.getCourses(),
+      ]);
+      setAreas(areasData);
+      setSubjects(subjectsData);
+      setCourses(coursesData);
+    } catch (err) {
+      console.error("Error al cargar datos del currículo:", err);
+    } finally {
+      setCurriculumLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "curriculum") {
+      loadCurriculumData();
+    }
+  }, [activeTab]);
+
+  // Area Handlers
+  const openCreateAreaModal = () => {
+    setEditingArea(null);
+    setAreaName("");
+    setAreaDescription("");
+    setIsAreaModalOpen(true);
+  };
+
+  const openEditAreaModal = (area: Area) => {
+    setEditingArea(area);
+    setAreaName(area.name);
+    setAreaDescription(area.description || "");
+    setIsAreaModalOpen(true);
+    setActiveAreaDropdown(null);
+  };
+
+  const handleAreaSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!areaName.trim()) return;
+    try {
+      const payload = { name: areaName, description: areaDescription || undefined, is_active: true };
+      if (editingArea) {
+        const updated = await curriculumApi.updateArea(editingArea.id, payload);
+        setAreas((prev) => prev.map((a) => (a.id === editingArea.id ? updated : a)));
+      } else {
+        const created = await curriculumApi.createArea(payload);
+        setAreas((prev) => [...prev, created]);
+      }
+      setIsAreaModalOpen(false);
+    } catch (err) {
+      console.error(err);
+      alert("Error al guardar el área");
+    }
+  };
+
+  const handleAreaDelete = async (id: number) => {
+    if (!confirm("¿Está seguro de eliminar esta área? Las asignaturas asociadas podrían verse afectadas.")) return;
+    try {
+      await curriculumApi.deleteArea(id);
+      setAreas((prev) => prev.filter((a) => a.id !== id));
+      const subjectsData = await curriculumApi.getSubjects();
+      setSubjects(subjectsData);
+      setActiveAreaDropdown(null);
+    } catch (err) {
+      console.error(err);
+      alert("Error al eliminar el área");
+    }
+  };
+
+  // Subject Handlers
+  const openCreateSubjectModal = () => {
+    setEditingSubject(null);
+    setSubjectName("");
+    setSubjectDescription("");
+    setSubjectAreaId(areas[0] ? String(areas[0].id) : "");
+    setSubjectCourses([]);
+    setIsSubjectModalOpen(true);
+  };
+
+  const openEditSubjectModal = (subject: Subject) => {
+    setEditingSubject(subject);
+    setSubjectName(subject.name);
+    setSubjectDescription(subject.description || "");
+    setSubjectAreaId(String(subject.area));
+    setSubjectCourses(subject.courses || []);
+    setIsSubjectModalOpen(true);
+    setActiveSubjectDropdown(null);
+  };
+
+  const handleSubjectSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!subjectName.trim() || !subjectAreaId) return;
+    try {
+      const payload = { name: subjectName, description: subjectDescription || undefined, area: Number(subjectAreaId), courses: subjectCourses, is_active: true };
+      if (editingSubject) {
+        const updated = await curriculumApi.updateSubject(editingSubject.id, payload);
+        setSubjects((prev) => prev.map((s) => (s.id === editingSubject.id ? updated : s)));
+      } else {
+        const created = await curriculumApi.createSubject(payload);
+        setSubjects((prev) => [...prev, created]);
+      }
+      setIsSubjectModalOpen(false);
+    } catch (err) {
+      console.error(err);
+      alert("Error al guardar la asignatura");
+    }
+  };
+
+  const handleSubjectDelete = async (id: number) => {
+    if (!confirm("¿Está seguro de eliminar esta asignatura?")) return;
+    try {
+      await curriculumApi.deleteSubject(id);
+      setSubjects((prev) => prev.filter((s) => s.id !== id));
+      setActiveSubjectDropdown(null);
+    } catch (err) {
+      console.error(err);
+      alert("Error al eliminar la asignatura");
+    }
+  };
+
+  const handleToggleCourseForSubject = (courseId: number) => {
+    setSubjectCourses((prev) =>
+      prev.includes(courseId) ? prev.filter((id) => id !== courseId) : [...prev, courseId]
+    );
+  };
+
 
   // Institution General Details
   const [institutionName, setInstitutionName] = useState("Colegio San Juan Bosco");
@@ -613,6 +778,17 @@ export function SettingsModule() {
             >
               <Clock className="w-5 h-5 shrink-0" />
               <span>Historial y Trazabilidad</span>
+            </button>
+            <button
+              onClick={() => setActiveTab("curriculum")}
+              className={`flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-medium transition-all whitespace-nowrap ${
+                activeTab === "curriculum"
+                  ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
+                  : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60"
+              }`}
+            >
+              <BookOpen className="w-5 h-5 shrink-0" />
+              <span>Áreas y Materias</span>
             </button>
           </nav>
         </div>
@@ -1499,6 +1675,386 @@ export function SettingsModule() {
               subtitle="Registro inalterable de quién configuró o ajustó los datos institucionales, fecha, IP y opción de restauración"
               onRestoreSuccess={loadSettings}
             />
+          )}
+
+          {/* TAB 4: ÁREAS Y MATERIAS (CURRÍCULO) */}
+          {activeTab === "curriculum" && (
+            <div className="space-y-6 animate-fade-in">
+              <section className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 p-6">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 pb-4 border-b border-slate-100 dark:border-slate-800">
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                      <BookOpen className="w-5 h-5 text-blue-500" />
+                      Plan de Estudios: Áreas y Materias
+                    </h2>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                      Define los campos de conocimiento (Áreas) y las asignaturas específicas asociadas a los cursos.
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={openCreateAreaModal}
+                      className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Nueva Área
+                    </button>
+                    <button
+                      onClick={openCreateSubjectModal}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Nueva Asignatura
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  {/* Left Column: Areas list */}
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-sm font-bold text-slate-700 dark:text-slate-305 flex items-center gap-1.5">
+                        <Layers className="w-4 h-4 text-slate-500" />
+                        Áreas Académicas ({areas.length})
+                      </h3>
+                      <div className="relative max-w-[180px]">
+                        <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="text"
+                          placeholder="Buscar área..."
+                          value={searchAreaTerm}
+                          onChange={(e) => setSearchAreaTerm(e.target.value)}
+                          className="w-full pl-7 pr-2.5 py-1 bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-500/20 text-slate-800 dark:text-slate-200 placeholder:text-slate-450"
+                        />
+                      </div>
+                    </div>
+
+                    {curriculumLoading ? (
+                      <div className="py-8 text-center text-xs text-slate-500">Cargando currículo...</div>
+                    ) : (
+                      <div className="border border-slate-100 dark:border-slate-800 rounded-xl overflow-hidden divide-y divide-slate-100 dark:divide-slate-800">
+                        {areas
+                          .filter((a) =>
+                            a.name.toLowerCase().includes(searchAreaTerm.toLowerCase()) ||
+                            (a.description && a.description.toLowerCase().includes(searchAreaTerm.toLowerCase()))
+                          )
+                          .map((area) => {
+                            const areaSubjects = subjects.filter((s) => s.area === area.id);
+                            return (
+                              <div
+                                key={area.id}
+                                className="p-3 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-805/30 transition-colors flex justify-between items-center gap-4 text-xs"
+                              >
+                                <div className="min-w-0 flex-1">
+                                  <div className="font-semibold text-slate-800 dark:text-slate-200 truncate">
+                                    {area.name}
+                                  </div>
+                                  <div className="text-[10px] text-slate-450 dark:text-slate-500 mt-0.5 line-clamp-1">
+                                    {area.description || "Sin descripción"}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-3 shrink-0">
+                                  <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-2 py-0.5 rounded-full font-bold">
+                                    {areaSubjects.length} materias
+                                  </span>
+                                  <div className="relative">
+                                    <button
+                                      onClick={() => setActiveAreaDropdown(activeAreaDropdown === area.id ? null : area.id)}
+                                      className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 rounded"
+                                    >
+                                      <MoreHorizontal className="w-4 h-4" />
+                                    </button>
+                                    {activeAreaDropdown === area.id && (
+                                      <div className="absolute right-0 top-full mt-1 bg-white dark:bg-slate-800 shadow-lg border border-slate-200 dark:border-slate-700 rounded-lg py-1 z-20 w-24 text-left">
+                                        <button
+                                          onClick={() => openEditAreaModal(area)}
+                                          className="w-full flex items-center gap-1.5 px-3 py-1.5 text-[10px] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/50"
+                                        >
+                                          <Edit className="w-3.5 h-3.5 text-slate-500" /> Editar
+                                        </button>
+                                        <button
+                                          onClick={() => handleAreaDelete(area.id)}
+                                          className="w-full flex items-center gap-1.5 px-3 py-1.5 text-[10px] text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20"
+                                        >
+                                          <Trash className="w-3.5 h-3.5 text-red-500" /> Eliminar
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        {areas.length === 0 && (
+                          <div className="p-8 text-center text-xs text-slate-500 italic">No hay áreas académicas.</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Right Column: Subjects list */}
+                  <div className="space-y-4">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                      <h3 className="text-sm font-bold text-slate-700 dark:text-slate-305 flex items-center gap-1.5">
+                        <BookOpen className="w-4 h-4 text-slate-500" />
+                        Asignaturas/Materias ({subjects.length})
+                      </h3>
+                      
+                      <div className="flex gap-2 w-full sm:w-auto">
+                        <select
+                          value={filterSubjectArea}
+                          onChange={(e) => setFilterSubjectArea(e.target.value)}
+                          className="px-2.5 py-1 bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-lg text-xs text-slate-700 dark:text-slate-200 focus:outline-none"
+                        >
+                          <option value="">Todas las Áreas</option>
+                          {areas.map((a) => (
+                            <option key={a.id} value={a.id}>{a.name}</option>
+                          ))}
+                        </select>
+                        <div className="relative flex-1 sm:max-w-[150px]">
+                          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2 top-1/2 -translate-y-1/2" />
+                          <input
+                            type="text"
+                            placeholder="Buscar materia..."
+                            value={searchSubjectTerm}
+                            onChange={(e) => setSearchSubjectTerm(e.target.value)}
+                            className="w-full pl-7 pr-2.5 py-1 bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-750 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-500/20 text-slate-800 dark:text-slate-200"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {curriculumLoading ? (
+                      <div className="py-8 text-center text-xs text-slate-500">Cargando materias...</div>
+                    ) : (
+                      <div className="border border-slate-100 dark:border-slate-800 rounded-xl overflow-hidden divide-y divide-slate-100 dark:divide-slate-800">
+                        {subjects
+                          .filter((subj) => {
+                            const matchesSearch =
+                              subj.name.toLowerCase().includes(searchSubjectTerm.toLowerCase()) ||
+                              (subj.description && subj.description.toLowerCase().includes(searchSubjectTerm.toLowerCase()));
+                            const matchesArea = filterSubjectArea ? subj.area === Number(filterSubjectArea) : true;
+                            return matchesSearch && matchesArea;
+                          })
+                          .map((subj) => (
+                            <div
+                              key={subj.id}
+                              className="p-3 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-805/30 transition-colors flex justify-between items-center gap-4 text-xs"
+                            >
+                              <div className="min-w-0 flex-1">
+                                <div className="font-semibold text-slate-800 dark:text-slate-200 truncate flex items-center gap-2">
+                                  <span>{subj.name}</span>
+                                  <span className="text-[9px] bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/50 px-1.5 py-0.2 rounded font-semibold shrink-0">
+                                    {subj.area_detail?.name || "Sin Área"}
+                                  </span>
+                                </div>
+                                <div className="text-[10px] text-slate-450 dark:text-slate-500 mt-1 flex flex-wrap gap-1">
+                                  {subj.courses_detail && subj.courses_detail.length > 0 ? (
+                                    subj.courses_detail.map((c) => (
+                                      <span key={c.id} className="bg-slate-100 dark:bg-slate-800 px-1 py-0.2 rounded text-slate-500">
+                                        {c.name}
+                                      </span>
+                                    ))
+                                  ) : (
+                                    <span className="text-rose-500 italic">No dictada en ningún curso</span>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-3 shrink-0">
+                                <div className="relative">
+                                  <button
+                                    onClick={() => setActiveSubjectDropdown(activeSubjectDropdown === subj.id ? null : subj.id)}
+                                    className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 rounded"
+                                  >
+                                    <MoreHorizontal className="w-4 h-4" />
+                                  </button>
+                                  {activeSubjectDropdown === subj.id && (
+                                    <div className="absolute right-0 top-full mt-1 bg-white dark:bg-slate-800 shadow-lg border border-slate-200 dark:border-slate-700 rounded-lg py-1 z-20 w-24 text-left">
+                                      <button
+                                        onClick={() => openEditSubjectModal(subj)}
+                                        className="w-full flex items-center gap-1.5 px-3 py-1.5 text-[10px] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/50"
+                                      >
+                                        <Edit className="w-3.5 h-3.5 text-slate-500" /> Editar
+                                      </button>
+                                      <button
+                                        onClick={() => handleSubjectDelete(subj.id)}
+                                        className="w-full flex items-center gap-1.5 px-3 py-1.5 text-[10px] text-red-600 hover:bg-red-50 dark:hover:bg-red-955/20"
+                                      >
+                                        <Trash className="w-3.5 h-3.5 text-red-500" /> Eliminar
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        {subjects.length === 0 && (
+                          <div className="p-8 text-center text-xs text-slate-500 italic">No hay asignaturas.</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </section>
+
+              {/* Area Creation/Edit Modal */}
+              {isAreaModalOpen && (
+                <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+                  <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-sm shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden text-xs">
+                    <div className="px-5 py-3.5 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/50">
+                      <h3 className="font-bold text-slate-800 dark:text-slate-100">
+                        {editingArea ? "Editar Área Académica" : "Nueva Área Académica"}
+                      </h3>
+                      <button onClick={() => setIsAreaModalOpen(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <form onSubmit={handleAreaSubmit} className="p-5 space-y-4">
+                      <div>
+                        <label className="block font-semibold text-slate-550 dark:text-slate-400 uppercase tracking-wider mb-1">
+                          Nombre del Área *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="ej: Ciencias Exactas, Humanidades"
+                          value={areaName}
+                          onChange={(e) => setAreaName(e.target.value)}
+                          className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-805 dark:text-slate-200 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-semibold text-slate-550 dark:text-slate-400 uppercase tracking-wider mb-1">
+                          Descripción
+                        </label>
+                        <textarea
+                          placeholder="Detalles o descripción del área."
+                          value={areaDescription}
+                          onChange={(e) => setAreaDescription(e.target.value)}
+                          rows={3}
+                          className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-805 dark:text-slate-200 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none resize-none"
+                        />
+                      </div>
+                      <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+                        <button
+                          type="button"
+                          onClick={() => setIsAreaModalOpen(false)}
+                          className="px-3.5 py-2 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg text-slate-700 dark:text-slate-200 font-medium"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          type="submit"
+                          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold shadow-sm"
+                        >
+                          {editingArea ? "Guardar Cambios" : "Crear Área"}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
+
+              {/* Subject Creation/Edit Modal */}
+              {isSubjectModalOpen && (
+                <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+                  <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-md shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden text-xs">
+                    <div className="px-5 py-3.5 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/50">
+                      <h3 className="font-bold text-slate-800 dark:text-slate-100">
+                        {editingSubject ? "Editar Asignatura" : "Nueva Asignatura"}
+                      </h3>
+                      <button onClick={() => setIsSubjectModalOpen(false)} className="text-slate-400 hover:text-slate-650 dark:hover:text-slate-200">
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <form onSubmit={handleSubjectSubmit} className="p-5 space-y-4">
+                      <div>
+                        <label className="block font-semibold text-slate-550 dark:text-slate-400 uppercase tracking-wider mb-1">
+                          Nombre de la Asignatura *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="ej: Matemáticas, Biología"
+                          value={subjectName}
+                          onChange={(e) => setSubjectName(e.target.value)}
+                          className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-805 dark:text-slate-200 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-semibold text-slate-550 dark:text-slate-400 uppercase tracking-wider mb-1">
+                          Área Académica *
+                        </label>
+                        <select
+                          required
+                          value={subjectAreaId}
+                          onChange={(e) => setSubjectAreaId(e.target.value)}
+                          className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                        >
+                          <option value="">Seleccione un área...</option>
+                          {areas.map((a) => (
+                            <option key={a.id} value={a.id}>{a.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block font-semibold text-slate-550 dark:text-slate-400 uppercase tracking-wider mb-1">
+                          Descripción
+                        </label>
+                        <textarea
+                          placeholder="Detalles sobre los temas dictados."
+                          value={subjectDescription}
+                          onChange={(e) => setSubjectDescription(e.target.value)}
+                          rows={2}
+                          className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-805 dark:text-slate-200 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none resize-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-semibold text-slate-550 dark:text-slate-405 uppercase tracking-wider mb-1.5">
+                          Asociar a Cursos
+                        </label>
+                        <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto p-2 bg-slate-50 dark:bg-slate-800/40 rounded-lg border border-slate-150 dark:border-slate-750 custom-scrollbar">
+                          {courses.map((course) => {
+                            const isChecked = subjectCourses.includes(course.id);
+                            return (
+                              <div
+                                key={course.id}
+                                onClick={() => handleToggleCourseForSubject(course.id)}
+                                className={`flex items-center gap-1.5 p-1.5 rounded border text-[10px] cursor-pointer select-none truncate ${
+                                  isChecked
+                                    ? "bg-blue-50 dark:bg-blue-950/20 border-blue-200 text-blue-700 dark:text-blue-400 font-bold"
+                                    : "bg-white dark:bg-slate-900 border-slate-200 text-slate-600 dark:text-slate-405"
+                                }`}
+                              >
+                                <div className={`w-3.5 h-3.5 rounded flex items-center justify-center border ${isChecked ? "bg-blue-600 border-blue-600 text-white" : "border-slate-350 dark:border-slate-600"}`}>
+                                  {isChecked && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+                                </div>
+                                <span className="truncate">{course.name}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+                        <button
+                          type="button"
+                          onClick={() => setIsSubjectModalOpen(false)}
+                          className="px-3.5 py-2 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg text-slate-700 dark:text-slate-200 font-medium"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          type="submit"
+                          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold shadow-sm"
+                        >
+                          {editingSubject ? "Guardar Cambios" : "Crear Asignatura"}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>

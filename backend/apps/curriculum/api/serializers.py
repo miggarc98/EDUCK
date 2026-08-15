@@ -1,7 +1,36 @@
 from rest_framework import serializers
-from apps.curriculum.domain.models import Course
+from apps.curriculum.domain.models import Course, Area, Subject
 from apps.auth_users.api.serializers import UserSerializer
 from apps.auth_users.models import User, UserRole
+
+class AreaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Area
+        fields = ('id', 'name', 'description', 'is_active', 'created_at', 'updated_at')
+        read_only_fields = ('id', 'created_at', 'updated_at')
+
+class SubjectSerializer(serializers.ModelSerializer):
+    area_detail = AreaSerializer(source='area', read_only=True)
+    courses_detail = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = Subject
+        fields = (
+            'id', 
+            'name', 
+            'description', 
+            'area', 
+            'area_detail', 
+            'courses', 
+            'courses_detail', 
+            'is_active', 
+            'created_at', 
+            'updated_at'
+        )
+        read_only_fields = ('id', 'created_at', 'updated_at')
+
+    def get_courses_detail(self, obj):
+        return [{'id': c.id, 'name': c.name} for c in obj.courses.all()]
 
 class CourseSerializer(serializers.ModelSerializer):
     director_detail = UserSerializer(source='director', read_only=True)
@@ -15,6 +44,7 @@ class CourseSerializer(serializers.ModelSerializer):
     students = serializers.SerializerMethodField()
     avgGrade = serializers.SerializerMethodField()
     attendance = serializers.SerializerMethodField()
+    subjects_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Course
@@ -28,7 +58,8 @@ class CourseSerializer(serializers.ModelSerializer):
             'is_active', 
             'students', 
             'avgGrade', 
-            'attendance'
+            'attendance',
+            'subjects_count'
         )
         read_only_fields = ('id',)
 
@@ -46,3 +77,7 @@ class CourseSerializer(serializers.ModelSerializer):
         attendances = ["95%", "92%", "98%", "94%", "90%", "96%", "97%", "98%"]
         idx = (obj.id or 0) % len(attendances)
         return attendances[idx]
+
+    def get_subjects_count(self, obj):
+        return obj.subjects.count()
+

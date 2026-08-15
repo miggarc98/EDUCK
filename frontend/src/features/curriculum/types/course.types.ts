@@ -25,6 +25,7 @@ export interface Course {
   students: number;
   avgGrade: string;
   attendance: string;
+  subjects_count?: number;
 }
 
 export interface CreateCoursePayload {
@@ -33,3 +34,26 @@ export interface CreateCoursePayload {
   degree?: string;
   director?: number | null;
 }
+
+export interface Area {
+  id: number;
+  name: string;
+  description?: string;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface Subject {
+  id: number;
+  name: string;
+  description?: string;
+  area: number;
+  area_detail?: Area;
+  courses: number[];
+  courses_detail?: { id: number; name: string }[];
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
