@@ -130,6 +130,66 @@ export function CoursesModule() {
     return currentSettings.offered_degrees[normalizedLevel] || [];
   };
 
+  const calculateCourseHourlyStatus = (course: Course) => {
+    if (!settings || !settings.start_time || !settings.end_time || !settings.block_duration_minutes) {
+      return { status: "unknown", required: 0, available: 0, deficit: 0 };
+    }
+    
+    const parseTime = (t: string) => {
+      const [h, m] = t.split(':').map(Number);
+      return h * 60 + m;
+    };
+    
+    const startMins = parseTime(settings.start_time);
+    const endMins = parseTime(settings.end_time);
+    const duration = settings.block_duration_minutes;
+    
+    let availableSlots = 0;
+    const allBreaks = settings.settings_json?.academic?.breaks || [];
+    const courseBreaks = allBreaks.filter((b: any) => Array.isArray(b.courses) && b.courses.includes(course.id));
+    
+    for (let day = 0; day < 5; day++) {
+      let current = startMins;
+      let safetyCounter = 0;
+      while (current + 5 < endMins) {
+        safetyCounter++;
+        if (safetyCounter > 100) break;
+        
+        const activeBreak = courseBreaks.find((b: any) => parseTime(b.start_time) <= current && current < parseTime(b.end_time));
+        if (activeBreak) {
+          current = parseTime(activeBreak.end_time);
+          continue;
+        }
+        
+        const nxt = current + duration;
+        if (nxt <= endMins) {
+          const overlapBreak = courseBreaks.find((b: any) => current < parseTime(b.start_time) && parseTime(b.start_time) < nxt);
+          if (overlapBreak) {
+            availableSlots++;
+            current = parseTime(overlapBreak.start_time);
+          } else {
+            availableSlots++;
+            current = nxt;
+          }
+        } else {
+          availableSlots++;
+          break;
+        }
+      }
+    }
+    
+    const requiredBlocks = subjects
+      .filter((sub) => Array.isArray(sub.courses) && sub.courses.includes(course.id))
+      .reduce((acc, sub) => acc + (sub.weekly_hours || 1), 0);
+    
+    return {
+      status: requiredBlocks < availableSlots ? "deficit" : (requiredBlocks > availableSlots ? "excess" : "ok"),
+      required: requiredBlocks,
+      available: availableSlots,
+      deficit: availableSlots - requiredBlocks
+    };
+  };
+
   const openCreateModal = () => {
     setEditingCourse(null);
     setCourseName("");
@@ -381,6 +441,17 @@ export function CoursesModule() {
     });
 
     return groups;
+  };
+
+  const handleUpdateSubjectHours = async (subj: Subject, newHours: number) => {
+    if (newHours < 1 || newHours > 40) return;
+    try {
+      await curriculumApi.updateSubject(subj.id, { weekly_hours: newHours });
+      setSubjects(prev => prev.map(s => s.id === subj.id ? { ...s, weekly_hours: newHours } : s));
+    } catch (e) {
+      console.error(e);
+      alert("Error al actualizar la intensidad horaria.");
+    }
   };
 
   if (selectedStudentForProfile && selectedCourseForStudents) {
@@ -729,6 +800,50 @@ export function CoursesModule() {
               </div>
             ) : (
               <div className="space-y-8 animate-fade-in">
+                {/* Hourly Intensity Overview Banner */}
+                {(() => {
+                  const hourlyStatus = calculateCourseHourlyStatus(selectedCourseForStudents);
+                  const isDeficit = hourlyStatus.status === "deficit";
+                  const isExcess = hourlyStatus.status === "excess";
+                  return (
+                    <div className={`p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
+                      isDeficit ? "bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800" :
+                      isExcess ? "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800" :
+                      "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800"
+                    }`}>
+                      <div>
+                        <h4 className={`text-sm font-bold flex items-center gap-2 ${
+                          isDeficit ? "text-amber-800 dark:text-amber-400" :
+                          isExcess ? "text-blue-800 dark:text-blue-400" :
+                          "text-emerald-800 dark:text-emerald-400"
+                        }`}>
+                          <Clock className="w-4 h-4" /> Resumen de Intensidad Horaria
+                        </h4>
+                        <p className={`text-xs mt-1 ${
+                          isDeficit ? "text-amber-700 dark:text-amber-300" :
+                          isExcess ? "text-blue-700 dark:text-blue-300" :
+                          "text-emerald-700 dark:text-emerald-300"
+                        }`}>
+                          {isDeficit ? `Faltan ${hourlyStatus.deficit} horas. Las asignaturas suman ${hourlyStatus.required} bloques, pero la jornada exige ${hourlyStatus.available} bloques en total.` :
+                           isExcess ? `Exceso de horas. Las asignaturas suman ${hourlyStatus.required} bloques, superando los ${hourlyStatus.available} bloques de la jornada.` :
+                           `¡Excelente! Las asignaturas cubren exactamente los ${hourlyStatus.available} bloques de la jornada.`}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-6">
+                        <div className="flex flex-col items-center">
+                          <span className="text-[10px] uppercase font-bold text-slate-500">Asignadas</span>
+                          <span className="text-xl font-black text-slate-800 dark:text-slate-100">{hourlyStatus.required}</span>
+                        </div>
+                        <span className="text-2xl font-light text-slate-300 dark:text-slate-600">/</span>
+                        <div className="flex flex-col items-center">
+                          <span className="text-[10px] uppercase font-bold text-slate-500">Requeridas</span>
+                          <span className="text-xl font-black text-slate-800 dark:text-slate-100">{hourlyStatus.available}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 {areaKeys.map((areaName) => (
                   <div key={areaName} className="space-y-3">
                     <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-805 pb-2">
@@ -750,6 +865,26 @@ export function CoursesModule() {
                             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">
                               {subj.description || "Sin descripción disponible."}
                             </p>
+                          </div>
+                          <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between">
+                            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                              Intensidad Horaria:
+                            </span>
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="number"
+                                min="1"
+                                max="40"
+                                value={subj.weekly_hours || 1}
+                                onChange={(e) => {
+                                  // Optimistic local update while typing to make it snappy
+                                  setSubjects(prev => prev.map(s => s.id === subj.id ? { ...s, weekly_hours: parseInt(e.target.value) || 1 } : s));
+                                }}
+                                onBlur={(e) => handleUpdateSubjectHours(subj, parseInt(e.target.value) || 1)}
+                                className="w-14 text-center text-sm font-bold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-md py-1 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                              />
+                              <span className="text-xs font-medium text-slate-500">bloques</span>
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -886,6 +1021,8 @@ export function CoursesModule() {
                   const directorName = course.director_detail
                     ? `${course.director_detail.first_name} ${course.director_detail.last_name}`
                     : "Sin Director";
+                  const hourlyStatus = calculateCourseHourlyStatus(course);
+
                   return (
                     <div
                       key={course.id}
@@ -991,6 +1128,15 @@ export function CoursesModule() {
                         </div>
                       </div>
 
+                      {hourlyStatus.status === "deficit" && (
+                        <div className="mb-3 p-2.5 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 rounded-xl flex items-start gap-2">
+                          <ShieldAlert className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                          <div className="text-[11px] leading-tight text-amber-700 dark:text-amber-300">
+                            <strong>Déficit de intensidad horaria:</strong> Las asignaturas actuales cubren {hourlyStatus.required} bloques semanales, pero el colegio exige {hourlyStatus.available} para este curso. Faltan {hourlyStatus.deficit} horas.
+                          </div>
+                        </div>
+                      )}
+
                       <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-50 dark:border-slate-805/50">
                         <div className="flex items-center gap-1.5 text-xs text-slate-605 dark:text-slate-400">
                           <Clock className="w-3.5 h-3.5 text-slate-405" />
@@ -1030,6 +1176,8 @@ export function CoursesModule() {
                       const directorName = course.director_detail
                         ? `${course.director_detail.first_name} ${course.director_detail.last_name}`
                         : "Sin Director";
+                      const hourlyStatus = calculateCourseHourlyStatus(course);
+                      
                       return (
                         <tr
                           key={course.id}
@@ -1045,6 +1193,11 @@ export function CoursesModule() {
                                 <div className="font-medium text-slate-800 dark:text-slate-100">
                                   {course.name}
                                 </div>
+                                {hourlyStatus.status === "deficit" && (
+                                  <div className="mt-1 flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 px-1.5 py-0.5 rounded border border-amber-200/50 dark:border-amber-800/50 w-fit">
+                                    <ShieldAlert className="w-3 h-3" /> Faltan {hourlyStatus.deficit} horas
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </td>

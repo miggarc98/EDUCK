@@ -59,5 +59,10 @@ export const academicsApi = {
 
   deleteSchedule: async (id: number): Promise<void> => {
     await apiClient.delete(`/academics/schedules/${id}/`);
+  },
+
+  generateSchedules: async (payload: { courses?: number[]; overwrite?: boolean }): Promise<any> => {
+    const response = await apiClient.post('/academics/schedules/generate/', payload, { timeout: 0 });
+    return response.data;
   }
 };

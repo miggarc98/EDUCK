@@ -32,6 +32,9 @@ class TeacherViewSet(viewsets.ModelViewSet):
 from apps.academics.models import ClassSchedule
 from apps.academics.api.serializers import ClassScheduleSerializer
 from apps.core.services.audit_service import AuditLogService
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from apps.academics.use_cases.schedule_generator import ScheduleGeneratorService
 
 class ClassScheduleViewSet(viewsets.ModelViewSet):
     queryset = ClassSchedule.objects.all().order_by('day', 'time_slot')
@@ -86,4 +89,20 @@ class ClassScheduleViewSet(viewsets.ModelViewSet):
             entity_name=f"Eliminado Horario: {instance.course.name} - {instance.day} {instance.time_slot} ({instance.subject.name})"
         )
         instance.delete()
+
+    @action(detail=False, methods=['post'])
+    def generate(self, request):
+        course_ids = request.data.get('courses')
+        overwrite = request.data.get('overwrite', False)
+        
+        generator = ScheduleGeneratorService(
+            course_ids=course_ids if course_ids else None,
+            overwrite=overwrite
+        )
+        
+        results = generator.generate()
+        return Response({
+            'message': f"Generación completada. Se asignaron {results['scheduled']} bloques.",
+            'results': results
+        })
 

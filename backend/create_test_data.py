@@ -226,7 +226,7 @@ def main():
         last_names = ['Gomez', 'Rodriguez', 'Martinez', 'Garcia', 'Lopez', 'Perez', 'Sanchez', 'Gonzalez', 'Fernandez', 'Torres']
         # Generate other roles (teachers, coordinators, parents)
         roles = [UserRole.TEACHER, UserRole.PARENT, UserRole.COORDINATOR]
-        for i in range(1, 61):
+        for i in range(1, 121):
             fn = first_names[i % len(first_names)]
             ln = last_names[i % len(last_names)]
             role = roles[i % len(roles)]
@@ -250,7 +250,7 @@ def main():
         ]
 
         # Generate other roles for Colegio B
-        for i in range(1, 61):
+        for i in range(1, 121):
             fn = first_names[i % len(first_names)]
             ln = last_names[i % len(last_names)]
             role = roles[i % len(roles)]
