@@ -49,7 +49,7 @@ class ScheduleGeneratorService:
             
             for course in courses:
                 # 1. Generate available time slots excluding breaks for this course
-                course_breaks = [b for b in all_breaks if b.get('courses') and course.id in b.get('courses', [])]
+                course_breaks = [b for b in all_breaks if not b.get('courses') or course.id in b.get('courses', [])]
                 slots = []
                 current = start_minutes
                 safety_counter = 0
@@ -90,7 +90,7 @@ class ScheduleGeneratorService:
                     needed_blocks = subject.weekly_hours - current_blocks
                     if needed_blocks <= 0: continue
                     
-                    # 3. Find valid teachers
+                    # 3. Find valid teachers by  Area , name 
                     valid_teachers = []
                     for t in teacher_profiles:
                         if not t.area: continue
@@ -110,45 +110,106 @@ class ScheduleGeneratorService:
                         results['messages'].append(f"Asignación forzada para '{subject.name}' (Curso {course.name}) sin docente de área.")
                         
                     blocks_scheduled_for_subject = 0
-                    available_spots = [(day, slot) for day in self.days for slot in slots if (day, slot) not in scheduled_spots]
-                    random.shuffle(available_spots)
                     
-                    for day, slot in available_spots:
-                        if blocks_scheduled_for_subject >= needed_blocks:
-                            break
-                            
-                        slot_start_str, slot_end_str = slot.split(' - ')
-                        slot_start, slot_end = to_min(slot_start_str.strip()), to_min(slot_end_str.strip())
+                    assigned_teacher = None
+                    subject_schedules = [s for s in existing_schedules if s.subject_id == subject.id]
+                    if subject_schedules:
+                        assigned_teacher_user_id = subject_schedules[0].teacher_id
+                        assigned_teacher = next((t for t in valid_teachers if t.user_id == assigned_teacher_user_id), None)
                         
-                        chosen_teacher = None
-                        random.shuffle(valid_teachers)
-                        for t in valid_teachers:
-                            day_avail = t.availability.get(day)
-                            if day_avail:
-                                t_start = to_min(day_avail.get('start_time', '00:00'))
-                                t_end = to_min(day_avail.get('end_time', '23:59'))
-                                if slot_start < t_start or slot_end > t_end:
-                                    continue
+                    while blocks_scheduled_for_subject < needed_blocks:
+                        remaining = needed_blocks - blocks_scheduled_for_subject
+                        
+                        chunks_size_2 = []
+                        chunks_size_1 = []
+                        
+                        for day in self.days:
+                            free_slots_today = [slot for slot in slots if (day, slot) not in scheduled_spots]
+                            current_day_blocks = sum(1 for (d, s), subj_id in scheduled_spots.items() if d == day and subj_id == subject.id)
                             
-                            if ClassSchedule.objects.filter(teacher=t.user, day=day, time_slot=slot).exists():
-                                continue
-                                
-                            chosen_teacher = t
+                            if current_day_blocks < 2:
+                                for s in free_slots_today:
+                                    chunks_size_1.append([(day, s)])
+                                    
+                                if current_day_blocks == 0 and remaining >= 2:
+                                    for i in range(len(free_slots_today) - 1):
+                                        idx1 = slots.index(free_slots_today[i])
+                                        idx2 = slots.index(free_slots_today[i+1])
+                                        if idx2 == idx1 + 1:
+                                            chunks_size_2.append([(day, free_slots_today[i]), (day, free_slots_today[i+1])])
+                                            
+                        random.shuffle(chunks_size_2)
+                        random.shuffle(chunks_size_1)
+                        
+                        candidate_chunks = []
+                        if remaining >= 2:
+                            candidate_chunks.extend(chunks_size_2)
+                        candidate_chunks.extend(chunks_size_1)
+                        
+                        if not candidate_chunks:
+                            for day in self.days:
+                                free_slots_today = [slot for slot in slots if (day, slot) not in scheduled_spots]
+                                for s in free_slots_today:
+                                    candidate_chunks.append([(day, s)])
+                            random.shuffle(candidate_chunks)
+                            
+                        if not candidate_chunks:
                             break
                             
-                        if chosen_teacher:
-                            ClassSchedule.objects.create(
-                                course=course,
-                                day=day,
-                                time_slot=slot,
-                                subject=subject,
-                                teacher=chosen_teacher.user,
-                                room=f"Aula {course.name}"
-                            )
-                            scheduled_spots[(day, slot)] = subject.id
-                            blocks_scheduled_for_subject += 1
-                            results['scheduled'] += 1
-                            course_scheduled_total += 1
+                        chunk_scheduled = False
+                        for chunk in candidate_chunks:
+                            chosen_teacher = None
+                            if assigned_teacher:
+                                teachers_to_try = [assigned_teacher]
+                            else:
+                                teachers_to_try = valid_teachers.copy()
+                                random.shuffle(teachers_to_try)
+                                
+                            for t in teachers_to_try:
+                                t_available = True
+                                for (day, slot) in chunk:
+                                    slot_start_str, slot_end_str = slot.split(' - ')
+                                    slot_start, slot_end = to_min(slot_start_str.strip()), to_min(slot_end_str.strip())
+                                    
+                                    day_avail = t.availability.get(day)
+                                    if day_avail:
+                                        t_start = to_min(day_avail.get('start_time', '00:00'))
+                                        t_end = to_min(day_avail.get('end_time', '23:59'))
+                                        if slot_start < t_start or slot_end > t_end:
+                                            t_available = False
+                                            break
+                                            
+                                    if ClassSchedule.objects.filter(teacher=t.user, day=day, time_slot=slot).exists():
+                                        t_available = False
+                                        break
+                                        
+                                if t_available:
+                                    chosen_teacher = t
+                                    break
+                                    
+                            if chosen_teacher:
+                                if not assigned_teacher:
+                                    assigned_teacher = chosen_teacher
+                                    
+                                for (day, slot) in chunk:
+                                    ClassSchedule.objects.create(
+                                        course=course,
+                                        day=day,
+                                        time_slot=slot,
+                                        subject=subject,
+                                        teacher=chosen_teacher.user,
+                                        room=f"Aula {course.name}"
+                                    )
+                                    scheduled_spots[(day, slot)] = subject.id
+                                    blocks_scheduled_for_subject += 1
+                                    results['scheduled'] += 1
+                                    course_scheduled_total += 1
+                                    
+                                chunk_scheduled = True
+                                break
+                                
+                        if not chunk_scheduled:
+                            break
                             
                     if blocks_scheduled_for_subject < needed_blocks:
                         results['failed'].append(f"Faltaron {needed_blocks - blocks_scheduled_for_subject} bloques para '{subject.name}' (Curso {course.name}).")

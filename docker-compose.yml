@@ -27,11 +27,12 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: educk_api
-    command: python manage.py runserver 0.0.0.0:8000
+    command: python -m debugpy --listen 0.0.0.0:5678 manage.py runserver 0.0.0.0:8000 --nothreading --noreload
     volumes:
       - ./backend:/app
     ports:
       - "8000:8000"
+      - "5678:5678"
     depends_on:
       - db
       - redis

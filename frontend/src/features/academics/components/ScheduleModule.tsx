@@ -161,9 +161,13 @@ export function ScheduleModule() {
     const startMinutes = parseTimeToMinutes(startTimeStr);
     const endMinutes = parseTimeToMinutes(endTimeStr);
 
-    // Get breaks that apply to this course
     const courseBreaks = (instSettings.settings_json?.breaks || []).filter(
-      (b: any) => Array.isArray(b.courses) && b.courses.includes(Number(courseId))
+      (b: any) => {
+        const isGlobal = !b.courses || (Array.isArray(b.courses) && b.courses.length === 0);
+        if (isGlobal) return true;
+        if (courseId !== "") return Array.isArray(b.courses) && b.courses.includes(Number(courseId));
+        return false;
+      }
     );
 
     const slots: TimeSlot[] = [];

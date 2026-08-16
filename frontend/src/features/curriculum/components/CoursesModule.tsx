@@ -20,6 +20,7 @@ import {
   MapPin,
   Layers,
   Check,
+  ChevronRight,
 } from "lucide-react";
 import { curriculumApi } from "../services/api";
 import type { Course, Teacher, Area, Subject } from "../types";
@@ -845,20 +846,26 @@ export function CoursesModule() {
                 })()}
 
                 {areaKeys.map((areaName) => (
-                  <div key={areaName} className="space-y-3">
-                    <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-805 pb-2">
-                      <Layers className="w-4 h-4 text-blue-500" />
-                      <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
-                        Área: {areaName}
-                      </h3>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                  <details key={areaName} className="group" open>
+                    <summary className="flex items-center gap-2 pb-2 cursor-pointer list-none outline-none border-b border-slate-100 dark:border-slate-800">
+                      <div className="flex items-center gap-2 flex-1 hover:bg-slate-50 dark:hover:bg-slate-800/40 p-1.5 -ml-1.5 rounded-lg transition-colors">
+                        <ChevronRight className="w-4 h-4 text-slate-400 group-open:rotate-90 transition-transform" />
+                        <Layers className="w-4 h-4 text-blue-500" />
+                        <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                          Área: {areaName} <span className="text-xs font-normal text-slate-400 normal-case ml-2">({groupedSubjects[areaName].length} asignaturas)</span>
+                        </h3>
+                      </div>
+                    </summary>
+                    <div className="pl-4 ml-[11px] mt-2 mb-4 border-l-2 border-slate-100 dark:border-slate-800 py-2 space-y-3">
                       {groupedSubjects[areaName].map((subj) => (
                         <div
                           key={subj.id}
-                          className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-100 dark:border-slate-800 hover:border-slate-200 dark:hover:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-all flex flex-col justify-between"
+                          className="relative p-4 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-100 dark:border-slate-800 hover:border-slate-200 dark:hover:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4"
                         >
-                          <div>
+                          {/* Tree branch line */}
+                          <div className="absolute -left-[18px] top-1/2 w-4 border-t-2 border-slate-100 dark:border-slate-800"></div>
+
+                          <div className="flex-1">
                             <h4 className="font-semibold text-slate-800 dark:text-slate-100 text-sm">
                               {subj.name}
                             </h4>
@@ -866,7 +873,8 @@ export function CoursesModule() {
                               {subj.description || "Sin descripción disponible."}
                             </p>
                           </div>
-                          <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between">
+                          
+                          <div className="flex items-center gap-3 bg-white dark:bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700">
                             <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
                               Intensidad Horaria:
                             </span>
@@ -889,7 +897,7 @@ export function CoursesModule() {
                         </div>
                       ))}
                     </div>
-                  </div>
+                  </details>
                 ))}
               </div>
             )}

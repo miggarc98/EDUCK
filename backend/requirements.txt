@@ -17,3 +17,5 @@ pytest-django
 factory-boy
 pyotp
 qrcode
+debugpy>=1.8.0
+
