@@ -3,7 +3,7 @@ import { ArrowLeft, User, Mail, BookOpen, Briefcase, Trash2, Edit2, Save, X, Clo
 import type { Teacher } from '../types';
 import { academicsApi } from '../services/api';
 
-import type { Area } from '../../curriculum/types';
+import type { Area, Course } from '../../curriculum/types';
 import type { InstitutionSettingData } from '../../institution/types';
 
 interface TeacherProfileProps {
@@ -12,10 +12,11 @@ interface TeacherProfileProps {
   onUpdate: (updated: Teacher) => void;
   onDelete: (id: number) => void;
   areasList: Area[];
+  coursesList: Course[];
   settings: InstitutionSettingData | null;
 }
 
-export function TeacherProfile({ teacher, onBack, onUpdate, onDelete, areasList, settings }: TeacherProfileProps) {
+export function TeacherProfile({ teacher, onBack, onUpdate, onDelete, areasList, coursesList, settings }: TeacherProfileProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [firstName, setFirstName] = useState(teacher.first_name || '');
   const [lastName, setLastName] = useState(teacher.last_name || '');
@@ -27,6 +28,7 @@ export function TeacherProfile({ teacher, onBack, onUpdate, onDelete, areasList,
   const [additionalAreas, setAdditionalAreas] = useState<string[]>(teacher.additional_areas || []);
   const [maxHours, setMaxHours] = useState<number>(teacher.max_hours || settings?.default_teacher_max_hours || 22);
   const [availableShifts, setAvailableShifts] = useState<string[]>(teacher.available_shifts || []);
+  const [titularCourseId, setTitularCourseId] = useState<number | null>(teacher.titular_course_id || null);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -45,7 +47,8 @@ export function TeacherProfile({ teacher, onBack, onUpdate, onDelete, areasList,
         availability: availability,
         additional_areas: additionalAreas,
         max_hours: maxHours,
-        available_shifts: availableShifts
+        available_shifts: availableShifts,
+        titular_course_id: titularCourseId
       });
       onUpdate(updated);
       setIsEditing(false);
@@ -333,6 +336,34 @@ export function TeacherProfile({ teacher, onBack, onUpdate, onDelete, areasList,
                       })
                     ) : (
                       <span className="text-sm text-slate-500 italic">No especificadas (Por defecto: Todas)</span>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
+                  Titular de (Curso)
+                </label>
+                {isEditing ? (
+                  <select
+                    value={titularCourseId || ''}
+                    onChange={(e) => setTitularCourseId(e.target.value ? Number(e.target.value) : null)}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm transition-all"
+                  >
+                    <option value="">Ninguno</option>
+                    {coursesList.map(c => (
+                      <option key={c.id} value={c.id}>{c.name} - {c.level}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <div>
+                    {teacher.titular_course ? (
+                      <span className="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                        {coursesList.find(c => c.id === teacher.titular_course)?.name || `Curso ID: ${teacher.titular_course}`}
+                      </span>
+                    ) : (
+                      <span className="text-sm text-slate-500 italic">No es titular</span>
                     )}
                   </div>
                 )}

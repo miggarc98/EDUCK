@@ -14,6 +14,8 @@ export interface Teacher {
   additional_areas?: string[];
   max_hours?: number;
   available_shifts?: string[];
+  titular_course?: number | null;
+  titular_course_id?: number | null;
 }
 
 export interface Course {

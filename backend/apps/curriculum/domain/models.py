@@ -13,6 +13,14 @@ class Course(models.Model):
         related_name="directed_courses",
         help_text="Director de grupo"
     )
+    titular = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="titular_courses",
+        help_text="Docente titular (dicta la mayoría de materias)"
+    )
     shift = models.CharField(max_length=50, blank=True, null=True, help_text="Jornada (ej. Mañana, Tarde)")
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)

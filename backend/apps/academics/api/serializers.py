@@ -21,6 +21,8 @@ class TeacherSerializer(serializers.ModelSerializer):
     additional_areas = serializers.JSONField(source='teacher_profile.additional_areas', required=False, default=list)
     max_hours = serializers.IntegerField(source='teacher_profile.max_hours', required=False, default=22)
     available_shifts = serializers.JSONField(source='teacher_profile.available_shifts', required=False, default=list)
+    titular_course = serializers.SerializerMethodField()
+    titular_course_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
     password = serializers.CharField(write_only=True, required=False)
 
     class Meta:
@@ -28,7 +30,7 @@ class TeacherSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'email', 'first_name', 'last_name', 'name', 'role', 'is_active',
             'profile', 'employee_id', 'area', 'load', 'status', 'password', 'availability',
-            'additional_areas', 'max_hours', 'available_shifts'
+            'additional_areas', 'max_hours', 'available_shifts', 'titular_course', 'titular_course_id'
         )
         read_only_fields = ('id', 'role', 'name', 'is_active')
 
@@ -36,8 +38,14 @@ class TeacherSerializer(serializers.ModelSerializer):
         name_str = f"{obj.first_name} {obj.last_name}".strip()
         return name_str if name_str else obj.email
 
+    def get_titular_course(self, obj):
+        course = obj.titular_courses.first()
+        return course.id if course else None
+
     def create(self, validated_data):
+        from apps.curriculum.models import Course
         profile_data = validated_data.pop('teacher_profile', {})
+        titular_course_id = validated_data.pop('titular_course_id', None)
         email = validated_data.get('email')
         password = validated_data.pop('password', 'Educk2026!')
         
@@ -60,10 +68,16 @@ class TeacherSerializer(serializers.ModelSerializer):
             max_hours=profile_data.get('max_hours', 22),
             available_shifts=profile_data.get('available_shifts', [])
         )
+        
+        if titular_course_id is not None:
+            Course.objects.filter(id=titular_course_id).update(titular=user)
+            
         return user
 
     def update(self, instance, validated_data):
+        from apps.curriculum.models import Course
         profile_data = validated_data.pop('teacher_profile', {})
+        titular_course_id = validated_data.pop('titular_course_id', None)
         
         instance.first_name = validated_data.get('first_name', instance.first_name)
         instance.last_name = validated_data.get('last_name', instance.last_name)
@@ -88,6 +102,12 @@ class TeacherSerializer(serializers.ModelSerializer):
             profile.available_shifts = profile_data.get('available_shifts')
         profile.save()
         
+        if titular_course_id is not None:
+            # Clear old titular courses
+            Course.objects.filter(titular=instance).update(titular=None)
+            # Set new
+            Course.objects.filter(id=titular_course_id).update(titular=instance)
+            
         return instance
 
 

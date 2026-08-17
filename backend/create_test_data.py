@@ -26,6 +26,11 @@ DEPARTMENTS_SPEC = [
         "asignaturas": ["Dimensiones del Desarrollo"]
     },
     {
+        "departamento": "Básica Primaria",
+        "cantidad_docentes": 10,
+        "asignaturas": []
+    },
+    {
         "departamento": "Matemáticas",
         "cantidad_docentes": 6,
         "asignaturas": ["Matemáticas", "Trigonometría (10º)", "Cálculo (11º)"]
@@ -220,15 +225,29 @@ def create_tenant_and_data(schema_name, tenant_name, domain_name, prefix):
                 
                 course_name = deg_section
                 
-                # Assign a random director
-                director = random.choice(all_teachers) if all_teachers else None
+                # Find a suitable titular
+                titular = None
+                if level == "Preescolar":
+                    titular_candidates = [t for t in all_teachers if t.teacher_profile.area == "Preescolar"]
+                    if titular_candidates:
+                        titular = titular_candidates.pop(0)
+                        all_teachers.remove(titular)
+                elif level == "Básica Primaria":
+                    titular_candidates = [t for t in all_teachers if t.teacher_profile.area == "Básica Primaria"]
+                    if titular_candidates:
+                        titular = titular_candidates.pop(0)
+                        all_teachers.remove(titular)
+                
+                # Assign director
+                director = titular if titular else (random.choice(all_teachers) if all_teachers else None)
                 
                 course, c_created = Course.objects.update_or_create(
                     name=course_name,
                     defaults={
                         'level': level,
                         'degree': deg,
-                        'director': director
+                        'director': director,
+                        'titular': titular
                     }
                 )
                 courses_list.append(course)

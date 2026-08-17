@@ -5,7 +5,7 @@ import type { Teacher } from '../types';
 import { academicsApi } from '../services/api';
 import { curriculumApi } from '../../curriculum/services/api';
 import { institutionApi } from '../../institution/services/api';
-import type { Area } from '../../curriculum/types';
+import type { Area, Course } from '../../curriculum/types';
 import type { InstitutionSettingData } from '../../institution/types';
 
 export function TeachersModule() {
@@ -14,6 +14,7 @@ export function TeachersModule() {
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
   
   const [areasList, setAreasList] = useState<Area[]>([]);
+  const [coursesList, setCoursesList] = useState<Course[]>([]);
   const [settings, setSettings] = useState<InstitutionSettingData | null>(null);
   
   // Search & Filter
@@ -32,6 +33,7 @@ export function TeachersModule() {
   const [newAdditionalAreas, setNewAdditionalAreas] = useState<string[]>([]);
   const [newMaxHours, setNewMaxHours] = useState(22);
   const [newAvailableShifts, setNewAvailableShifts] = useState<string[]>([]);
+  const [newTitularCourse, setNewTitularCourse] = useState<number | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
 
@@ -42,14 +44,16 @@ export function TeachersModule() {
   const fetchTeachers = async () => {
     setLoading(true);
     try {
-      const [data, areasData, settingsData] = await Promise.all([
+      const [data, areasData, settingsData, coursesData] = await Promise.all([
         academicsApi.getTeachers(),
         curriculumApi.getAreas(),
-        institutionApi.getSettings()
+        institutionApi.getSettings(),
+        curriculumApi.getCourses()
       ]);
       setTeachers(data);
       setAreasList(areasData);
       setSettings(settingsData);
+      setCoursesList(coursesData);
       setNewMaxHours(settingsData?.default_teacher_max_hours || 22);
     } catch (err) {
       console.error('Error fetching data:', err);
@@ -78,6 +82,7 @@ export function TeachersModule() {
         additional_areas: newAdditionalAreas,
         max_hours: newMaxHours,
         available_shifts: newAvailableShifts,
+        titular_course_id: newTitularCourse,
         password: 'Educk2026!' // Default password for new teachers
       });
       setTeachers((prev) => [...prev, created]);
@@ -101,6 +106,7 @@ export function TeachersModule() {
     setNewAdditionalAreas([]);
     setNewMaxHours(settings?.default_teacher_max_hours || 22);
     setNewAvailableShifts([]);
+    setNewTitularCourse(null);
     setModalError(null);
   };
 
@@ -142,6 +148,7 @@ export function TeachersModule() {
           onUpdate={handleUpdateTeacher}
           onDelete={handleDeleteTeacher}
           areasList={areasList}
+          coursesList={coursesList}
           settings={settings}
         />
       )}

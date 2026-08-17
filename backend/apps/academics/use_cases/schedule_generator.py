@@ -117,6 +117,8 @@ class ScheduleGeneratorService:
                     s_area = subject.area.name.lower().strip()
                     s_name = subject.name.lower().strip()
                     
+                    course_titular_id = course.titular_id
+
                     for t in teacher_profiles:
                         # Check shift availability
                         if course.shift and isinstance(getattr(t, 'available_shifts', None), list) and t.available_shifts:
@@ -132,24 +134,28 @@ class ScheduleGeneratorService:
                         if current_t_hours >= max_allowed:
                             continue
                             
+                        is_titular = (t.user_id == course_titular_id)
+
                         t_areas = [t.area.lower().strip()] if t.area else []
                         if isinstance(t.additional_areas, list):
                             t_areas.extend([a.lower().strip() for a in t.additional_areas])
                             
-                        is_match = False
-                        for ta in t_areas:
-                            if ta in s_area or s_area in ta or ta in s_name or s_name in ta:
-                                is_match = True
-                                break
+                        is_match = is_titular
+                        if not is_match:
+                            for ta in t_areas:
+                                if ta in s_area or s_area in ta or ta in s_name or s_name in ta:
+                                    is_match = True
+                                    break
                                 
                         if is_match:
                             valid_teachers.append(t)
                             
-                    # Sort valid teachers: primary area match first, then by current assigned hours (ascending)
+                    # Sort valid teachers: titular first, then primary area match, then by current assigned hours (ascending)
                     def sort_key(t):
+                        is_titular = (t.user_id == course.titular_id)
                         t_primary = t.area.lower().strip() if t.area else ""
                         primary_match = (t_primary in s_area or s_area in t_primary or t_primary in s_name or s_name in t_primary)
-                        return (not primary_match, teacher_hours_assigned.get(t.user_id, 0))
+                        return (not is_titular, not primary_match, teacher_hours_assigned.get(t.user_id, 0))
                         
                     valid_teachers.sort(key=sort_key)
                     
@@ -169,6 +175,10 @@ class ScheduleGeneratorService:
                         if fallback_teachers:
                             fallback_teachers.sort(key=lambda t: teacher_hours_assigned.get(t.user_id, 0))
                             valid_teachers = fallback_teachers[:1]
+                        elif course.titular:
+                            titular_profile = next((t for t in teacher_profiles if t.user_id == course.titular_id), None)
+                            if titular_profile: valid_teachers = [titular_profile]
+                            else: valid_teachers = teacher_profiles[:1]
                         elif course.director:
                             dir_profile = next((t for t in teacher_profiles if t.user_id == course.director_id), None)
                             if dir_profile: valid_teachers = [dir_profile]
