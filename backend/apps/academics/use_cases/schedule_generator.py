@@ -47,14 +47,31 @@ class ScheduleGeneratorService:
                     "Necesitamos más maestros o subir la carga/pedir más tiempo a los maestros actuales."
                 )
             
+            # Pre-load teacher assigned hours
+            teacher_hours_assigned = {}
+            for t in teacher_profiles:
+                teacher_hours_assigned[t.user_id] = ClassSchedule.objects.filter(teacher=t.user).count()
+            
+            # Helper to get shift config
+            shifts_config = self.settings.shifts if isinstance(self.settings.shifts, list) else []
+            shift_dict = {s.get('id'): s for s in shifts_config if isinstance(s, dict)}
+            
             for course in courses:
                 # 1. Generate available time slots excluding breaks for this course
+                course_shift = shift_dict.get(course.shift)
+                if course_shift:
+                    c_start_min = to_min(course_shift.get('start_time', '07:00'))
+                    c_end_min = to_min(course_shift.get('end_time', '14:30'))
+                else:
+                    c_start_min = to_min(self.settings.start_time or '07:00')
+                    c_end_min = to_min(self.settings.end_time or '14:30')
+                
                 course_breaks = [b for b in all_breaks if not b.get('courses') or course.id in b.get('courses', [])]
                 slots = []
-                current = start_minutes
+                current = c_start_min
                 safety_counter = 0
                 
-                while current + 5 < end_minutes:
+                while current + 5 < c_end_min:
                     safety_counter += 1
                     if safety_counter > 100: break
                     
@@ -64,7 +81,7 @@ class ScheduleGeneratorService:
                         continue
                         
                     nxt = current + duration
-                    if nxt <= end_minutes:
+                    if nxt <= c_end_min:
                         overlap_break = next((b for b in course_breaks if current < to_min(b['start_time']) < nxt), None)
                         if overlap_break:
                             b_start = to_min(overlap_break['start_time'])
@@ -74,7 +91,7 @@ class ScheduleGeneratorService:
                             slots.append(f"{format_time(current)} - {format_time(nxt)}")
                             current = nxt
                     else:
-                        slots.append(f"{format_time(current)} - {format_time(end_minutes)}")
+                        slots.append(f"{format_time(current)} - {format_time(c_end_min)}")
                         break
                 
                 # 2. Retrieve required subjects
@@ -87,21 +104,72 @@ class ScheduleGeneratorService:
                 for subject in subjects:
                     current_blocks = sum(1 for s in existing_schedules if s.subject_id == subject.id)
                     course_scheduled_total += current_blocks
-                    needed_blocks = subject.weekly_hours - current_blocks
+                    
+                    target_hours = subject.weekly_hours
+                    if isinstance(subject.weekly_hours_overrides, dict) and course.degree:
+                        target_hours = subject.weekly_hours_overrides.get(course.degree, subject.weekly_hours)
+                        
+                    needed_blocks = target_hours - current_blocks
                     if needed_blocks <= 0: continue
                     
-                    # 3. Find valid teachers by  Area , name 
+                    # 3. Find valid teachers by max_hours and Area
                     valid_teachers = []
+                    s_area = subject.area.name.lower().strip()
+                    s_name = subject.name.lower().strip()
+                    
                     for t in teacher_profiles:
-                        if not t.area: continue
-                        t_area = t.area.lower().strip()
-                        s_area = subject.area.name.lower().strip()
-                        s_name = subject.name.lower().strip()
-                        if t_area in s_area or s_area in t_area or t_area in s_name or s_name in t_area:
+                        # Check shift availability
+                        if course.shift and isinstance(getattr(t, 'available_shifts', None), list) and t.available_shifts:
+                            if course.shift not in t.available_shifts:
+                                continue
+                                
+                        current_t_hours = teacher_hours_assigned.get(t.user_id, 0)
+                        
+                        max_allowed = getattr(t, 'max_hours', None)
+                        if max_allowed is None:
+                            max_allowed = getattr(self.settings, 'default_teacher_max_hours', 22)
+                            
+                        if current_t_hours >= max_allowed:
+                            continue
+                            
+                        t_areas = [t.area.lower().strip()] if t.area else []
+                        if isinstance(t.additional_areas, list):
+                            t_areas.extend([a.lower().strip() for a in t.additional_areas])
+                            
+                        is_match = False
+                        for ta in t_areas:
+                            if ta in s_area or s_area in ta or ta in s_name or s_name in ta:
+                                is_match = True
+                                break
+                                
+                        if is_match:
                             valid_teachers.append(t)
+                            
+                    # Sort valid teachers: primary area match first, then by current assigned hours (ascending)
+                    def sort_key(t):
+                        t_primary = t.area.lower().strip() if t.area else ""
+                        primary_match = (t_primary in s_area or s_area in t_primary or t_primary in s_name or s_name in t_primary)
+                        return (not primary_match, teacher_hours_assigned.get(t.user_id, 0))
+                        
+                    valid_teachers.sort(key=sort_key)
                     
                     if not valid_teachers:
-                        if course.director:
+                        # Buscamos profes como última opción que no hayan superado horas y que coincida su shift
+                        fallback_teachers = []
+                        for t in teacher_profiles:
+                            max_allowed = getattr(t, 'max_hours', None)
+                            if max_allowed is None:
+                                max_allowed = getattr(self.settings, 'default_teacher_max_hours', 22)
+                                
+                            if teacher_hours_assigned.get(t.user_id, 0) >= max_allowed: continue
+                            if course.shift and getattr(t, 'available_shifts', None):
+                                if course.shift not in t.available_shifts: continue
+                            fallback_teachers.append(t)
+                            
+                        if fallback_teachers:
+                            fallback_teachers.sort(key=lambda t: teacher_hours_assigned.get(t.user_id, 0))
+                            valid_teachers = fallback_teachers[:1]
+                        elif course.director:
                             dir_profile = next((t for t in teacher_profiles if t.user_id == course.director_id), None)
                             if dir_profile: valid_teachers = [dir_profile]
                             else: valid_teachers = teacher_profiles[:1]
@@ -116,6 +184,8 @@ class ScheduleGeneratorService:
                     if subject_schedules:
                         assigned_teacher_user_id = subject_schedules[0].teacher_id
                         assigned_teacher = next((t for t in valid_teachers if t.user_id == assigned_teacher_user_id), None)
+                        if assigned_teacher and teacher_hours_assigned.get(assigned_teacher.user_id, 0) >= getattr(assigned_teacher, 'max_hours', 22):
+                            assigned_teacher = None
                         
                     while blocks_scheduled_for_subject < needed_blocks:
                         remaining = needed_blocks - blocks_scheduled_for_subject
@@ -197,13 +267,14 @@ class ScheduleGeneratorService:
                                         day=day,
                                         time_slot=slot,
                                         subject=subject,
-                                        teacher=chosen_teacher.user,
-                                        room=f"Aula {course.name}"
+                                        teacher=chosen_teacher.user
                                     )
                                     scheduled_spots[(day, slot)] = subject.id
-                                    blocks_scheduled_for_subject += 1
-                                    results['scheduled'] += 1
-                                    course_scheduled_total += 1
+                                    teacher_hours_assigned[chosen_teacher.user_id] = teacher_hours_assigned.get(chosen_teacher.user_id, 0) + 1
+                                    
+                                blocks_scheduled_for_subject += len(chunk)
+                                results['scheduled'] += len(chunk)
+                                course_scheduled_total += len(chunk)
                                     
                                 chunk_scheduled = True
                                 break

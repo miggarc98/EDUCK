@@ -3,14 +3,19 @@ import { ArrowLeft, User, Mail, BookOpen, Briefcase, Trash2, Edit2, Save, X, Clo
 import type { Teacher } from '../types';
 import { academicsApi } from '../services/api';
 
+import type { Area } from '../../curriculum/types';
+import type { InstitutionSettingData } from '../../institution/types';
+
 interface TeacherProfileProps {
   teacher: Teacher;
   onBack: () => void;
   onUpdate: (updated: Teacher) => void;
   onDelete: (id: number) => void;
+  areasList: Area[];
+  settings: InstitutionSettingData | null;
 }
 
-export function TeacherProfile({ teacher, onBack, onUpdate, onDelete }: TeacherProfileProps) {
+export function TeacherProfile({ teacher, onBack, onUpdate, onDelete, areasList, settings }: TeacherProfileProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [firstName, setFirstName] = useState(teacher.first_name || '');
   const [lastName, setLastName] = useState(teacher.last_name || '');
@@ -19,6 +24,9 @@ export function TeacherProfile({ teacher, onBack, onUpdate, onDelete }: TeacherP
   const [load, setLoad] = useState(teacher.load || 0);
   const [status, setStatus] = useState<any>(teacher.status || 'active');
   const [availability, setAvailability] = useState<any>(teacher.availability || {});
+  const [additionalAreas, setAdditionalAreas] = useState<string[]>(teacher.additional_areas || []);
+  const [maxHours, setMaxHours] = useState<number>(teacher.max_hours || settings?.default_teacher_max_hours || 22);
+  const [availableShifts, setAvailableShifts] = useState<string[]>(teacher.available_shifts || []);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -34,7 +42,10 @@ export function TeacherProfile({ teacher, onBack, onUpdate, onDelete }: TeacherP
         area: area,
         load: Number(load),
         status: status,
-        availability: availability
+        availability: availability,
+        additional_areas: additionalAreas,
+        max_hours: maxHours,
+        available_shifts: availableShifts
       });
       onUpdate(updated);
       setIsEditing(false);
@@ -243,6 +254,107 @@ export function TeacherProfile({ teacher, onBack, onUpdate, onDelete }: TeacherP
                       </span>
                     )}
                   </div>
+                )}
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
+                  Áreas Adicionales (Soporte)
+                </label>
+                {isEditing ? (
+                  <div className="flex flex-wrap gap-2">
+                    {areasList.map(a => (
+                      <label key={a.id} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={additionalAreas.includes(a.name)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setAdditionalAreas([...additionalAreas, a.name]);
+                            } else {
+                              setAdditionalAreas(additionalAreas.filter(area => area !== a.name));
+                            }
+                          }}
+                          className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500"
+                        />
+                        <span className="text-slate-700 dark:text-slate-200">{a.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {teacher.additional_areas && teacher.additional_areas.length > 0 ? (
+                      teacher.additional_areas.map(a => (
+                        <span key={a} className="inline-block px-3 py-1.5 text-sm font-medium text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg">
+                          {a}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-sm text-slate-500 italic">Ninguna</span>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
+                  Jornadas Disponibles
+                </label>
+                {isEditing ? (
+                  <div className="flex flex-wrap gap-2">
+                    {settings?.shifts?.map(s => (
+                      <label key={s.id} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-sm cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={availableShifts.includes(s.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setAvailableShifts([...availableShifts, s.id]);
+                            } else {
+                              setAvailableShifts(availableShifts.filter(shift => shift !== s.id));
+                            }
+                          }}
+                          className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500"
+                        />
+                        <span className="text-slate-700 dark:text-slate-200">{s.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {teacher.available_shifts && teacher.available_shifts.length > 0 ? (
+                      teacher.available_shifts.map(shiftId => {
+                        const shiftName = settings?.shifts?.find(s => s.id === shiftId)?.name || shiftId;
+                        return (
+                          <span key={shiftId} className="inline-block px-3 py-1.5 text-sm font-medium text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg">
+                            {shiftName}
+                          </span>
+                        );
+                      })
+                    ) : (
+                      <span className="text-sm text-slate-500 italic">No especificadas (Por defecto: Todas)</span>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
+                  Límite Máximo de Horas/Semana
+                </label>
+                {isEditing ? (
+                  <input
+                    type="number"
+                    value={maxHours}
+                    onChange={(e) => setMaxHours(Number(e.target.value))}
+                    min={1}
+                    max={50}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm transition-all"
+                  />
+                ) : (
+                  <span className="inline-block px-3 py-1.5 text-sm font-bold text-slate-800 dark:text-slate-250 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg">
+                    {teacher.max_hours || settings?.default_teacher_max_hours || 22} hrs
+                  </span>
                 )}
               </div>
             </div>

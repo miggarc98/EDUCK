@@ -44,7 +44,13 @@ class InstitutionSetting(models.Model):
     active_period = models.CharField(max_length=50, default='1er Periodo')
     start_time = models.CharField(max_length=10, default='07:00')
     end_time = models.CharField(max_length=10, default='14:30')
+    shifts = models.JSONField(
+        default=list, 
+        blank=True, 
+        help_text="Lista de jornadas con sus horarios. Ej: [{'name': 'Mañana', 'start_time': '07:00', 'end_time': '12:30'}]"
+    )
     block_duration_minutes = models.IntegerField(default=45)
+    default_teacher_max_hours = models.IntegerField(default=22, help_text="Límite máximo de horas semanal predeterminado por docente")
 
     # Escala de calificaciones
     general_scale = models.CharField(max_length=100, default='1.0 - 5.0 (Numérica)')

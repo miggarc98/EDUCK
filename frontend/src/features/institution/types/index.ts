@@ -37,6 +37,8 @@ export interface InstitutionSettingData {
   start_time: string;
   end_time: string;
   block_duration_minutes: number;
+  default_teacher_max_hours?: number;
+  shifts?: { id: string; name: string; start_time: string; end_time: string }[];
 
   general_scale: string;
   decimal_precision: number;

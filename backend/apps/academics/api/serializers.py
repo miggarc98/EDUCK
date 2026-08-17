@@ -5,7 +5,7 @@ from apps.academics.models import TeacherProfile
 class TeacherProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = TeacherProfile
-        fields = ('employee_id', 'area', 'academic_load', 'status', 'availability')
+        fields = ('employee_id', 'area', 'academic_load', 'status', 'availability', 'additional_areas', 'max_hours', 'available_shifts')
         read_only_fields = ('employee_id',)
 
 class TeacherSerializer(serializers.ModelSerializer):
@@ -18,13 +18,17 @@ class TeacherSerializer(serializers.ModelSerializer):
     load = serializers.IntegerField(source='teacher_profile.academic_load', required=False, default=0)
     status = serializers.CharField(source='teacher_profile.status', required=False, default='active')
     availability = serializers.JSONField(source='teacher_profile.availability', required=False, default=dict)
+    additional_areas = serializers.JSONField(source='teacher_profile.additional_areas', required=False, default=list)
+    max_hours = serializers.IntegerField(source='teacher_profile.max_hours', required=False, default=22)
+    available_shifts = serializers.JSONField(source='teacher_profile.available_shifts', required=False, default=list)
     password = serializers.CharField(write_only=True, required=False)
 
     class Meta:
         model = User
         fields = (
             'id', 'email', 'first_name', 'last_name', 'name', 'role', 'is_active',
-            'profile', 'employee_id', 'area', 'load', 'status', 'password', 'availability'
+            'profile', 'employee_id', 'area', 'load', 'status', 'password', 'availability',
+            'additional_areas', 'max_hours', 'available_shifts'
         )
         read_only_fields = ('id', 'role', 'name', 'is_active')
 
@@ -51,7 +55,10 @@ class TeacherSerializer(serializers.ModelSerializer):
             area=profile_data.get('area', ''),
             academic_load=profile_data.get('academic_load', 0),
             status=profile_data.get('status', 'active'),
-            availability=profile_data.get('availability', {})
+            availability=profile_data.get('availability', {}),
+            additional_areas=profile_data.get('additional_areas', []),
+            max_hours=profile_data.get('max_hours', 22),
+            available_shifts=profile_data.get('available_shifts', [])
         )
         return user
 
@@ -73,6 +80,12 @@ class TeacherSerializer(serializers.ModelSerializer):
             profile.status = profile_data.get('status')
         if 'availability' in profile_data:
             profile.availability = profile_data.get('availability')
+        if 'additional_areas' in profile_data:
+            profile.additional_areas = profile_data.get('additional_areas')
+        if 'max_hours' in profile_data:
+            profile.max_hours = profile_data.get('max_hours')
+        if 'available_shifts' in profile_data:
+            profile.available_shifts = profile_data.get('available_shifts')
         profile.save()
         
         return instance

@@ -11,6 +11,9 @@ export interface Teacher {
   load?: number;
   status?: 'active' | 'on_leave';
   availability?: Record<string, { start_time: string; end_time: string }>;
+  additional_areas?: string[];
+  max_hours?: number;
+  available_shifts?: string[];
 }
 
 export interface Course {
@@ -55,6 +58,7 @@ export interface Subject {
   courses: number[];
   courses_detail?: { id: number; name: string }[];
   weekly_hours?: number;
+  weekly_hours_overrides?: Record<string, number>;
   is_active: boolean;
   created_at?: string;
   updated_at?: string;

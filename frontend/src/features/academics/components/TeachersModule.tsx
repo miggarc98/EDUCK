@@ -3,11 +3,18 @@ import { Search, Filter, MoreHorizontal, Briefcase, Mail, Plus, X, GraduationCap
 import { TeacherProfile } from './TeacherProfile';
 import type { Teacher } from '../types';
 import { academicsApi } from '../services/api';
+import { curriculumApi } from '../../curriculum/services/api';
+import { institutionApi } from '../../institution/services/api';
+import type { Area } from '../../curriculum/types';
+import type { InstitutionSettingData } from '../../institution/types';
 
 export function TeachersModule() {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
+  
+  const [areasList, setAreasList] = useState<Area[]>([]);
+  const [settings, setSettings] = useState<InstitutionSettingData | null>(null);
   
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
@@ -20,8 +27,11 @@ export function TeachersModule() {
   const [newLastName, setNewLastName] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [newArea, setNewArea] = useState('');
-  const [newLoad, setNewLoad] = useState(20);
+  const [newLoad, setNewLoad] = useState(22);
   const [newStatus, setNewStatus] = useState<'active' | 'on_leave'>('active');
+  const [newAdditionalAreas, setNewAdditionalAreas] = useState<string[]>([]);
+  const [newMaxHours, setNewMaxHours] = useState(22);
+  const [newAvailableShifts, setNewAvailableShifts] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
 
@@ -32,10 +42,17 @@ export function TeachersModule() {
   const fetchTeachers = async () => {
     setLoading(true);
     try {
-      const data = await academicsApi.getTeachers();
+      const [data, areasData, settingsData] = await Promise.all([
+        academicsApi.getTeachers(),
+        curriculumApi.getAreas(),
+        institutionApi.getSettings()
+      ]);
       setTeachers(data);
+      setAreasList(areasData);
+      setSettings(settingsData);
+      setNewMaxHours(settingsData?.default_teacher_max_hours || 22);
     } catch (err) {
-      console.error('Error fetching teachers:', err);
+      console.error('Error fetching data:', err);
     } finally {
       setLoading(false);
     }
@@ -58,6 +75,9 @@ export function TeachersModule() {
         area: newArea,
         load: Number(newLoad),
         status: newStatus,
+        additional_areas: newAdditionalAreas,
+        max_hours: newMaxHours,
+        available_shifts: newAvailableShifts,
         password: 'Educk2026!' // Default password for new teachers
       });
       setTeachers((prev) => [...prev, created]);
@@ -76,8 +96,11 @@ export function TeachersModule() {
     setNewLastName('');
     setNewEmail('');
     setNewArea('');
-    setNewLoad(20);
+    setNewLoad(22);
     setNewStatus('active');
+    setNewAdditionalAreas([]);
+    setNewMaxHours(settings?.default_teacher_max_hours || 22);
+    setNewAvailableShifts([]);
     setModalError(null);
   };
 
@@ -118,6 +141,8 @@ export function TeachersModule() {
           onBack={() => setSelectedTeacher(null)}
           onUpdate={handleUpdateTeacher}
           onDelete={handleDeleteTeacher}
+          areasList={areasList}
+          settings={settings}
         />
       )}
 

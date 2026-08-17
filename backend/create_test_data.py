@@ -1,6 +1,7 @@
 import os
 import django
 import sys
+import random
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 django.setup()
@@ -9,7 +10,75 @@ from apps.platform_admin.models import Tenant, Domain
 from apps.auth_users.models import User, UserRole
 from django_tenants.utils import schema_context
 
-def create_tenant_and_users(schema_name, tenant_name, domain_name, users_data):
+def get_base_users(prefix):
+    return [
+        (f'superadmin.{prefix}@colegio{prefix}.edu.co', 'password123', 'Super', f'Admin {prefix.upper()}', UserRole.SUPERADMIN),
+        (f'admin.{prefix}@colegio{prefix}.edu.co', 'password123', 'Admin', f'General {prefix.upper()}', UserRole.ADMIN),
+        (f'coordinador.{prefix}@colegio{prefix}.edu.co', 'password123', 'Coordinador', f'Academico {prefix.upper()}', UserRole.COORDINATOR),
+        (f'padre.{prefix}@colegio{prefix}.edu.co', 'password123', 'Padre', f'Familia {prefix.upper()}', UserRole.PARENT),
+    ]
+
+# The Departments and Teachers spec
+DEPARTMENTS_SPEC = [
+    {
+        "departamento": "Preescolar",
+        "cantidad_docentes": 6,
+        "asignaturas": ["Dimensiones del Desarrollo"]
+    },
+    {
+        "departamento": "Matemáticas",
+        "cantidad_docentes": 6,
+        "asignaturas": ["Matemáticas", "Trigonometría (10º)", "Cálculo (11º)"]
+    },
+    {
+        "departamento": "Humanidades e Idiomas",
+        "cantidad_docentes": 8,
+        "asignaturas": ["Lengua Castellana", "Literatura", "Idioma Extranjero (Inglés)"]
+    },
+    {
+        "departamento": "Ciencias Naturales",
+        "cantidad_docentes": 5,
+        "asignaturas": ["Ciencias Naturales y Educación Ambiental", "Biología (Media)", "Física (Media)", "Química (Media)"]
+    },
+    {
+        "departamento": "Ciencias Sociales",
+        "cantidad_docentes": 5,
+        "asignaturas": ["Ciencias Sociales", "Ciencias Económicas y Políticas (Media)", "Filosofía (Media)"]
+    },
+    {
+        "departamento": "Educación Artística",
+        "cantidad_docentes": 2,
+        "asignaturas": ["Educación Artística"]
+    },
+    {
+        "departamento": "Educación Física",
+        "cantidad_docentes": 2,
+        "asignaturas": ["Educación Física, Recreación y Deportes"]
+    },
+    {
+        "departamento": "Tecnología e Informática",
+        "cantidad_docentes": 2,
+        "asignaturas": ["Tecnología e Informática"]
+    },
+    {
+        "departamento": "Ética y Religión",
+        "cantidad_docentes": 2,
+        "asignaturas": ["Educación Ética y Valores Humanos", "Educación Religiosa"]
+    }
+]
+
+# The Courses Spec
+DEGREES_BY_LEVEL = {
+    "Preescolar": ["Pre-Jardín A", "Pre-Jardín B", "Jardín A", "Jardín B", "Transición A", "Transición B"],
+    "Básica Primaria": ["1ºA", "1ºB", "2ºA", "2ºB", "3ºA", "3ºB", "4ºA", "4ºB", "5ºA", "5ºB"],
+    "Básica Secundaria": ["6ºA", "6ºB", "7ºA", "7ºB", "8ºA", "8ºB", "9ºA", "9ºB"],
+    "Media Académica": ["10ºA", "10ºB", "11ºA", "11ºB"]
+}
+
+FIRST_NAMES = ['Juan', 'Maria', 'Pedro', 'Ana', 'Luis', 'Sofia', 'Carlos', 'Laura', 'Diego', 'Lucia', 'Jose', 'Elena', 'Fernando', 'Isabella', 'Miguel', 'Valentina', 'Andres', 'Camila']
+LAST_NAMES = ['Gomez', 'Rodriguez', 'Martinez', 'Garcia', 'Lopez', 'Perez', 'Sanchez', 'Gonzalez', 'Fernandez', 'Torres', 'Ramirez', 'Alvarez', 'Ruiz', 'Suarez']
+
+def create_tenant_and_data(schema_name, tenant_name, domain_name, prefix):
     # 1. Create or get Tenant
     tenant, created = Tenant.objects.get_or_create(
         schema_name=schema_name,
@@ -30,171 +99,201 @@ def create_tenant_and_users(schema_name, tenant_name, domain_name, users_data):
     else:
         print(f"⚠️  El dominio {domain_name} ya existe")
 
-    # 3. Create users inside the tenant's schema
+    # 3. Create users and data inside the tenant's schema
     with schema_context(schema_name):
-        for email, password, first_name, last_name, role in users_data:
-            if User.objects.filter(email=email).exists():
-                print(f"  ⚠️  El usuario {email} ya existe en {schema_name}")
-            else:
-                User.objects.create_user(
-                    email=email,
-                    password=password,
-                    first_name=first_name,
-                    last_name=last_name,
-                    role=role
-                )
-                print(f"  ✅ Usuario creado en {schema_name}: {email} ({role})")
+        users_to_create = get_base_users(prefix)
 
-        # Create test courses/groups for each degree
-        from apps.curriculum.domain.models import Course
+        # Create students (generate 200)
+        for i in range(1, 201):
+            fn = FIRST_NAMES[i % len(FIRST_NAMES)]
+            ln = LAST_NAMES[i % len(LAST_NAMES)]
+            users_to_create.append((f"student.{prefix}.{i}@colegio{prefix}.edu.co", "password123", f"{fn}", f"{ln}", UserRole.STUDENT))
+
+        for email, password, first_name, last_name, role in users_to_create:
+            if not User.objects.filter(email=email).exists():
+                User.objects.create_user(email=email, password=password, first_name=first_name, last_name=last_name, role=role)
+
+        print(f"  ✅ Usuarios base y estudiantes creados en {schema_name}")
+
+        # Delete existing data to recreate perfectly (optional but good for clean state)
+        from apps.curriculum.domain.models import Area, Subject, Course
+        from apps.academics.domain.models import TeacherProfile
+        from apps.institution.domain.models import InstitutionSetting
+        from apps.enrollment.domain.models import StudentProfile
+        import datetime
         import random
-        teachers = list(User.objects.filter(role=UserRole.TEACHER))
-        if teachers:
-            # Create teacher profiles
-            from apps.academics.domain.models import TeacherProfile
-            for teacher in teachers:
-                TeacherProfile.objects.get_or_create(
-                    user=teacher,
+        import re
+        
+        # Configure Institution Shifts
+        setting = InstitutionSetting.get_solo()
+        setting.shifts = [
+            {"id": "manana", "name": "Mañana", "start_time": "06:30", "end_time": "12:30"},
+            {"id": "tarde", "name": "Tarde", "start_time": "12:30", "end_time": "18:30"}
+        ]
+        setting.save()
+
+        Area.objects.all().delete()
+        Course.objects.all().delete()
+        TeacherProfile.objects.all().delete()
+        
+        # We need to delete old teachers who might not match our exact 38
+        User.objects.filter(role=UserRole.TEACHER).delete()
+
+        # Now, create exactly 38 teachers according to Departments
+        teacher_idx = 1
+        all_teachers = []
+        for dept in DEPARTMENTS_SPEC:
+            dept_name = dept["departamento"]
+            
+            # Create Area
+            area, _ = Area.objects.get_or_create(
+                name=dept_name,
+                defaults={'description': f"Departamento de {dept_name}", 'is_mandatory': True}
+            )
+
+            # Create Subjects
+            for subj_name in dept["asignaturas"]:
+                # set some default hours, preescolar usually has large block 27 hrs? we'll set 4 as default
+                Subject.objects.get_or_create(
+                    name=subj_name,
+                    area=area,
+                    defaults={'description': f"{subj_name}", 'weekly_hours': 4}
+                )
+
+            # Create exact number of teachers
+            for i in range(dept["cantidad_docentes"]):
+                fn = FIRST_NAMES[teacher_idx % len(FIRST_NAMES)]
+                ln = LAST_NAMES[teacher_idx % len(LAST_NAMES)]
+                # Sanitize email string
+                clean_dept = dept_name.lower().replace(" ", "").replace("á", "a").replace("é", "e").replace("í", "i").replace("ó", "o").replace("ú", "u")
+                email = f"docente.{prefix}.{clean_dept[:6]}{teacher_idx}@colegio{prefix}.edu.co"
+                
+                teacher_user, u_created = User.objects.get_or_create(
+                    email=email,
                     defaults={
-                        'area': random.choice(["Matemáticas", "Ciencias Naturales", "Humanidades", "Ciencias Sociales", "Tecnología"]),
-                        'academic_load': random.randint(10, 25),
-                        'status': 'active'
+                        'first_name': fn,
+                        'last_name': ln,
+                        'role': UserRole.TEACHER
                     }
                 )
-            print(f"    ✅ Perfiles de docente creados para {len(teachers)} docentes en {schema_name}")
-
-            degrees_by_level = {
-                "Preescolar": ["Pre-Jardín", "Jardín", "Transición"],
-                "Básica Primaria": ["1º", "2º", "3º", "4º", "5º"],
-                "Básica Secundaria": ["6º", "7º", "8º", "9º"],
-                "Media Académica": ["10º", "11º"]
-            }
-            courses_list = []
-            for level, degrees in degrees_by_level.items():
-                for deg in degrees:
-                    for section in ["A", "B"]:
-                        course_name = f"Grado {deg}{section}"
-                        course, c_created = Course.objects.get_or_create(
-                            name=course_name,
-                            defaults={
-                                'level': level,
-                                'degree': deg,
-                                'director': random.choice(teachers)
-                            }
-                        )
-                        courses_list.append(course)
-                        if c_created:
-                            print(f"    ✅ Curso creado en {schema_name}: {course_name} (Director: {course.director.email})")
-                        else:
-                            if not course.director and teachers:
-                                course.director = random.choice(teachers)
-                                course.save()
-                                print(f"    🔄 Curso actualizado con director en {schema_name}: {course_name} (Director: {course.director.email})")
-                            else:
-                                print(f"    ⚠️  El curso {course_name} ya existe en {schema_name}")
-
-            # Create Areas and Subjects, link them to courses
-            from apps.curriculum.domain.models import Area, Subject
-            areas_data = {
-                "Matemáticas": ["Matemáticas", "Geometría"],
-                "Ciencias Naturales": ["Biología", "Física", "Química"],
-                "Humanidades e Idiomas": ["Lengua Castellana", "Inglés"],
-                "Ciencias Sociales": ["Ciencias Sociales", "Historia"],
-                "Tecnología e Informática": ["Informática"]
-            }
-
-            for area_name, subject_names in areas_data.items():
-                area, _ = Area.objects.get_or_create(
-                    name=area_name,
-                    defaults={'description': f"Área de {area_name}", 'is_mandatory': True}
+                if u_created:
+                    teacher_user.set_password('password123')
+                    teacher_user.save()
+                
+                all_teachers.append(teacher_user)
+                
+                # Randomize available shifts for teachers to test the generator
+                avail_shifts = random.choice([
+                    ["manana"],
+                    ["tarde"],
+                    ["manana", "tarde"]
+                ])
+                
+                TeacherProfile.objects.update_or_create(
+                    user=teacher_user,
+                    defaults={
+                        'area': dept_name,
+                        'max_hours': 22,
+                        'academic_load': 0,
+                        'status': 'active',
+                        'available_shifts': avail_shifts
+                    }
                 )
-                for sub_name in subject_names:
-                    subject, s_created = Subject.objects.get_or_create(
-                        name=sub_name,
-                        area=area,
-                        defaults={'description': f"Asignatura {sub_name}"}
-                    )
-                    if courses_list:
-                        subject.courses.set(courses_list)
+                
+                teacher_idx += 1
 
-            print(f"    ✅ Áreas y asignaturas creadas y asociadas a cursos en {schema_name}")
+        print(f"    ✅ Creados 38 docentes y organizados por departamentos en {schema_name}")
 
-            # Assign students to courses randomly and create StudentProfile
-            from apps.enrollment.domain.models import StudentProfile
-            import datetime
-            import re
+        # Create Courses
+        courses_list = []
+        # Assign Preescolar and Primaria to Mañana, Secundaria and Media to Tarde
+        for level, degree_list in DEGREES_BY_LEVEL.items():
+            shift_id = "manana" if level in ["Preescolar", "Básica Primaria"] else "tarde"
+            
+            for deg_section in degree_list:
+                if deg_section.endswith(('A', 'B')):
+                    deg = deg_section[:-1].strip()
+                    section = deg_section[-1]
+                else:
+                    deg = deg_section
+                    section = ""
+                
+                course_name = deg_section
+                
+                # Assign a random director
+                director = random.choice(all_teachers) if all_teachers else None
+                
+                course, c_created = Course.objects.update_or_create(
+                    name=course_name,
+                    defaults={
+                        'level': level,
+                        'degree': deg,
+                        'director': director
+                    }
+                )
+                courses_list.append(course)
 
-            students = list(User.objects.filter(role=UserRole.STUDENT))
-            courses_list = list(Course.objects.all())
-            blood_types = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-']
-            med_notes = [
-                'Alérgico a la penicilina. Asma leve.',
-                'Ninguna conocida.',
-                'Intolerancia a la lactosa.',
-                'Ninguna conocida. Usa gafas formuladas.',
-                'Usa inhalador para asma.'
-            ]
-            relations = ['Madre', 'Padre', 'Tía', 'Tío', 'Abuela', 'Abuelo']
-            g_first_names = ['María', 'Carlos', 'Ana', 'Pedro', 'Rosa', 'Luis', 'Sofía', 'Jorge']
-            g_last_names = ['Pérez', 'García', 'López', 'Rodríguez', 'Sánchez', 'Gómez']
+        print(f"    ✅ Creados 28 cursos (Grados específicos) en {schema_name}")
 
-            if students and courses_list:
-                for idx, student in enumerate(students):
-                    assigned_course = random.choice(courses_list)
-                    student.current_course = assigned_course
-                    student.current_degree = assigned_course.degree
-                    student.enrollment_status = random.choices(
-                        ['pre_enrolled', 'enrolled', 'withdrawn', 'graduated'],
-                        weights=[10, 80, 5, 5]
-                    )[0]
-                    student.save()
+        # Associate all subjects with their corresponding courses
+        all_subjects = Subject.objects.all()
+        for subj in all_subjects:
+            valid_courses = []
+            for c in courses_list:
+                # Preescolar solo tiene "Dimensiones"
+                if c.level == "Preescolar":
+                    if "Dimensiones" in subj.name:
+                        valid_courses.append(c)
+                    continue
+                
+                # Las demás NO tienen Dimensiones
+                if "Dimensiones" in subj.name:
+                    continue
+                
+                # Check specifics
+                if "(10º)" in subj.name and "10º" not in c.name: continue
+                if "(11º)" in subj.name and "11º" not in c.name: continue
+                if "(Media)" in subj.name and c.level != "Media Académica": continue
+                
+                valid_courses.append(c)
+            
+            subj.courses.set(valid_courses)
 
-                    # Generate previous year's history for some students to have realistic data
-                    from apps.enrollment.domain.models import StudentAcademicHistory
-                    deg = assigned_course.degree or ""
-                    match = re.search(r'(\d+)', deg)
-                    if match:
-                        grade_num = int(match.group(1))
-                        current_year = 2024
-                        # If student is in a grade higher than 5º, generate up to 2 years of prior history
-                        if grade_num > 5:
-                            for yr_offset in range(1, min(3, grade_num - 4)):
-                                prev_year = current_year - yr_offset
-                                prev_grade = f"{grade_num - yr_offset}º"
-                                StudentAcademicHistory.objects.update_or_create(
-                                    student=student,
-                                    year=prev_year,
-                                    defaults={'degree': prev_grade}
-                                )
+        print(f"    ✅ Asignaturas vinculadas a cursos en {schema_name}")
 
-                    # Calculate age based on degree
-                    deg = assigned_course.degree or "6º"
-                    match = re.search(r'\d+', deg)
-                    if match:
-                        grade_num = int(match.group())
-                        age = grade_num + 5
-                    else:
-                        age = 5 # Pre-Jardín, Jardín, Transición
-                    
-                    birth_year = 2026 - age # Current year is 2026 based on metadata
-                    birth_date = datetime.date(birth_year, 1, 1)
+        # Students enrollment
+        students = list(User.objects.filter(role=UserRole.STUDENT))
+        blood_types = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-']
+        med_notes = ['Alérgico a la penicilina.', 'Ninguna conocida.', 'Intolerancia a la lactosa.']
+        relations = ['Madre', 'Padre', 'Tía', 'Abuela']
+        
+        for idx, student in enumerate(students):
+            assigned_course = courses_list[idx % len(courses_list)]
+            student.current_course = assigned_course
+            student.current_degree = assigned_course.degree
+            student.enrollment_status = 'enrolled'
+            student.save()
 
-                    # Create or update StudentProfile
-                    StudentProfile.objects.update_or_create(
-                        user=student,
-                        defaults={
-                            'phone': f"+57 300 {100 + (idx % 100):03d} {4567 + idx:04d}",
-                            'address': f"Calle {idx + 1} #{45 + (idx % 50)}-{67 + (idx % 30)}, Bogotá",
-                            'birth_date': birth_date,
-                            'blood_type': random.choice(blood_types),
-                            'medical_notes': random.choice(med_notes),
-                            'guardian_name': f"{random.choice(g_first_names)} {random.choice(g_last_names)}",
-                            'guardian_relation': random.choice(relations),
-                            'guardian_phone': f"+57 310 {987 - (idx % 100):03d} {6543 - idx:04d}",
-                            'guardian_email': f"acudiente.{student.id}@ejemplo.com"
-                        }
-                    )
-                print(f"    ✅ {len(students)} estudiantes asignados a cursos y con perfiles creados en {schema_name}")
+            match = re.search(r'\d+', assigned_course.degree or "6º")
+            age = int(match.group()) + 5 if match else 5
+            birth_date = datetime.date(2026 - age, 1, 1)
+
+            StudentProfile.objects.update_or_create(
+                user=student,
+                defaults={
+                    'phone': f"+57 300 000 {1000 + idx}",
+                    'address': f"Calle Test #{idx}",
+                    'birth_date': birth_date,
+                    'blood_type': random.choice(blood_types),
+                    'medical_notes': random.choice(med_notes),
+                    'guardian_name': f"Acudiente {idx}",
+                    'guardian_relation': random.choice(relations),
+                    'guardian_phone': f"+57 310 000 {1000 + idx}",
+                    'guardian_email': f"acudiente.{student.id}@ejemplo.com"
+                }
+            )
+
+        print(f"    ✅ Estudiantes matriculados a los 28 cursos en {schema_name}")
 
 def main():
     try:
@@ -206,67 +305,19 @@ def main():
         if created:
             print("✅ Tenant público creado")
         
-        public_domain, d_created = Domain.objects.get_or_create(
+        Domain.objects.get_or_create(
             domain='localhost',
             defaults={'tenant': public_tenant, 'is_primary': True}
         )
-        if d_created:
-            print("✅ Dominio localhost para public creado")
 
-        # Institution A
-        users_a = [
-            ('superadmin.a@colegioa.edu.co', 'password123', 'Super', 'Admin A', UserRole.SUPERADMIN),
-            ('admin.a@colegioa.edu.co', 'password123', 'Ana', 'Martinez', UserRole.ADMIN),
-            ('coordinador.a@colegioa.edu.co', 'password123', 'Carlos', 'Gomez', UserRole.COORDINATOR),
-            ('docente.a@colegioa.edu.co', 'password123', 'Maria', 'Rodriguez', UserRole.TEACHER),
-            ('padre.a@colegioa.edu.co', 'password123', 'Pedro', 'Acosta', UserRole.PARENT),
-        ]
-        
-        first_names = ['Juan', 'Maria', 'Pedro', 'Ana', 'Luis', 'Sofia', 'Carlos', 'Laura', 'Diego', 'Lucia', 'Jose', 'Elena']
-        last_names = ['Gomez', 'Rodriguez', 'Martinez', 'Garcia', 'Lopez', 'Perez', 'Sanchez', 'Gonzalez', 'Fernandez', 'Torres']
-        # Generate other roles (teachers, coordinators, parents)
-        roles = [UserRole.TEACHER, UserRole.PARENT, UserRole.COORDINATOR]
-        for i in range(1, 121):
-            fn = first_names[i % len(first_names)]
-            ln = last_names[i % len(last_names)]
-            role = roles[i % len(roles)]
-            users_a.append((f"user.a.{i}@colegioa.edu.co", "password123", f"{fn} {i}", ln, role))
-
-        # Generate 200 explicit students for Colegio A
-        for i in range(1, 201):
-            fn = first_names[i % len(first_names)]
-            ln = last_names[i % len(last_names)]
-            users_a.append((f"student.a.{i}@colegioa.edu.co", "password123", f"Estudiante A{i}", f"{ln} {fn}", UserRole.STUDENT))
-
-        create_tenant_and_users('inst_a', 'Colegio A', 'colegioa.localhost', users_a)
-
-        # Institution B
-        users_b = [
-            ('superadmin.b@colegiob.edu.co', 'password123', 'Super', 'Admin B', UserRole.SUPERADMIN),
-            ('admin.b@colegiob.edu.co', 'password123', 'Beatriz', 'Ruiz', UserRole.ADMIN),
-            ('coordinador.b@colegiob.edu.co', 'password123', 'Andres', 'Perez', UserRole.COORDINATOR),
-            ('estudiante.b@colegiob.edu.co', 'password123', 'Juan', 'Castro', UserRole.STUDENT),
-            ('padre.b@colegiob.edu.co', 'password123', 'Patricia', 'Suarez', UserRole.PARENT),
-        ]
-
-        # Generate other roles for Colegio B
-        for i in range(1, 121):
-            fn = first_names[i % len(first_names)]
-            ln = last_names[i % len(last_names)]
-            role = roles[i % len(roles)]
-            users_b.append((f"user.b.{i}@colegiob.edu.co", "password123", f"{fn} {i}", ln, role))
-
-        # Generate 200 explicit students for Colegio B
-        for i in range(1, 201):
-            fn = first_names[i % len(first_names)]
-            ln = last_names[i % len(last_names)]
-            users_b.append((f"student.b.{i}@colegiob.edu.co", "password123", f"Estudiante B{i}", f"{ln} {fn}", UserRole.STUDENT))
-
-        create_tenant_and_users('inst_b', 'Colegio B', 'colegiob.localhost', users_b)
+        create_tenant_and_data('inst_a', 'Escenario Educk A', 'colegioa.localhost', 'a')
+        create_tenant_and_data('inst_b', 'Escenario Educk B', 'colegiob.localhost', 'b')
 
         print("\n🎉 ¡Datos de prueba generados con éxito!")
     except Exception as e:
         print(f"❌ Error al crear datos de prueba: {e}")
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
 
 if __name__ == '__main__':

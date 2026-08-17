@@ -30,7 +30,7 @@ import { enrollmentApi } from "@/features/enrollment/services/api";
 import type { Student } from "@/features/enrollment/types/student.types";
 import { TeacherProfile } from "./TeacherProfile";
 
-type TabType = "courses" | "areas" | "subjects";
+type TabType = "courses" | "areas" | "subjects" | "degrees";
 type CourseSubTabType = "students" | "subjects";
 
 export function CoursesModule() {
@@ -92,6 +92,10 @@ export function CoursesModule() {
   const [selectedStudentForProfile, setSelectedStudentForProfile] = useState<Student | null>(null);
   const [selectedTeacherForProfile, setSelectedTeacherForProfile] = useState<Teacher | null>(null);
 
+  // Degrees Management states
+  const [selectedDegree, setSelectedDegree] = useState<string | null>(null);
+  const uniqueDegrees = Array.from(new Set(courses.map(c => c.degree).filter(Boolean))).sort();
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -147,7 +151,7 @@ export function CoursesModule() {
     
     let availableSlots = 0;
     const allBreaks = settings.settings_json?.academic?.breaks || [];
-    const courseBreaks = allBreaks.filter((b: any) => Array.isArray(b.courses) && b.courses.includes(course.id));
+    const courseBreaks = allBreaks.filter((b: any) => !b.courses || b.courses.length === 0 || (Array.isArray(b.courses) && b.courses.includes(course.id)));
     
     for (let day = 0; day < 5; day++) {
       let current = startMins;
@@ -181,7 +185,10 @@ export function CoursesModule() {
     
     const requiredBlocks = subjects
       .filter((sub) => Array.isArray(sub.courses) && sub.courses.includes(course.id))
-      .reduce((acc, sub) => acc + (sub.weekly_hours || 1), 0);
+      .reduce((acc, sub) => {
+        const override = course.degree && sub.weekly_hours_overrides ? sub.weekly_hours_overrides[course.degree] : undefined;
+        return acc + (override !== undefined ? override : (sub.weekly_hours || 1));
+      }, 0);
     
     return {
       status: requiredBlocks < availableSlots ? "deficit" : (requiredBlocks > availableSlots ? "excess" : "ok"),
@@ -189,6 +196,54 @@ export function CoursesModule() {
       available: availableSlots,
       deficit: availableSlots - requiredBlocks
     };
+  };
+
+  const calculateDegreeHourlyStatus = (degree: string) => {
+    const representativeCourse = courses.find(c => c.degree === degree);
+    if (!representativeCourse) return { status: "unknown", required: 0, available: 0, deficit: 0 };
+    return calculateCourseHourlyStatus(representativeCourse);
+  };
+
+  const handleToggleSubjectForDegree = async (subject: Subject, degree: string) => {
+    const coursesInDegree = courses.filter(c => c.degree === degree);
+    if (coursesInDegree.length === 0) return;
+    
+    // Si alguna asignatura ya está asignada a ALGÚN curso de este grado, la quitamos de todos.
+    const isAssigned = subject.courses?.some(cId => coursesInDegree.some(c => c.id === cId));
+    let newCourseIds = [...(subject.courses || [])];
+    
+    if (isAssigned) {
+      newCourseIds = newCourseIds.filter(cId => !coursesInDegree.some(c => c.id === cId));
+    } else {
+      coursesInDegree.forEach(c => {
+        if (!newCourseIds.includes(c.id)) newCourseIds.push(c.id);
+      });
+    }
+    
+    try {
+      await curriculumApi.updateSubject(subject.id, { courses: newCourseIds });
+      setSubjects(prev => prev.map(s => s.id === subject.id ? { ...s, courses: newCourseIds } : s));
+    } catch (err) {
+      console.error("Error updating subject for degree", err);
+      setError("Error al asignar la materia al grado.");
+    }
+  };
+
+  const handleUpdateSubjectDegreeHours = async (subject: Subject, degree: string, newHours: number) => {
+    if (newHours < 1) newHours = 1;
+    try {
+      const currentOverrides = subject.weekly_hours_overrides || {};
+      const newOverrides = { ...currentOverrides, [degree]: newHours };
+      
+      // Optimistic local update
+      setSubjects(prev => prev.map(s => s.id === subject.id ? { ...s, weekly_hours_overrides: newOverrides } : s));
+      
+      await curriculumApi.updateSubject(subject.id, { weekly_hours_overrides: newOverrides });
+    } catch (err) {
+      console.error("Error updating subject degree hours", err);
+      setError("Error al actualizar la intensidad horaria del grado.");
+      fetchData(); // Revert on error
+    }
   };
 
   const openCreateModal = () => {
@@ -916,11 +971,13 @@ export function CoursesModule() {
             {activeTab === "courses" && "Gestión de Cursos"}
             {activeTab === "areas" && "Áreas Académicas"}
             {activeTab === "subjects" && "Gestión de Asignaturas"}
+            {activeTab === "degrees" && "Malla Curricular por Grados"}
           </h1>
           <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
             {activeTab === "courses" && "Administra los grupos, directores y estadísticas de cada curso."}
             {activeTab === "areas" && "Configura las áreas que agrupan las asignaturas de la institución."}
             {activeTab === "subjects" && "Administra y configura las asignaturas/materias dictadas y sus cursos asociados."}
+            {activeTab === "degrees" && "Asigna materias y gestiona la intensidad horaria global para cada grado académico."}
           </p>
         </div>
 
@@ -989,6 +1046,15 @@ export function CoursesModule() {
             }`}
         >
           Asignaturas
+        </button>
+        <button
+          onClick={() => { setActiveTab("degrees"); }}
+          className={`pb-3 font-semibold text-sm transition-all relative ${activeTab === "degrees"
+              ? "text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400"
+              : "text-slate-500 dark:text-slate-400 hover:text-slate-850 dark:hover:text-slate-200"
+            }`}
+        >
+          Malla Curricular por Grados
         </button>
       </div>
 
@@ -1137,10 +1203,26 @@ export function CoursesModule() {
                       </div>
 
                       {hourlyStatus.status === "deficit" && (
-                        <div className="mb-3 p-2.5 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 rounded-xl flex items-start gap-2">
-                          <ShieldAlert className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                        <div className="mb-3 p-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 rounded-lg flex items-center gap-2">
+                          <ShieldAlert className="w-4 h-4 text-amber-500 shrink-0" />
                           <div className="text-[11px] leading-tight text-amber-700 dark:text-amber-300">
-                            <strong>Déficit de intensidad horaria:</strong> Las asignaturas actuales cubren {hourlyStatus.required} bloques semanales, pero el colegio exige {hourlyStatus.available} para este curso. Faltan {hourlyStatus.deficit} horas.
+                            Faltan {hourlyStatus.deficit} horas para completar la jornada ({hourlyStatus.available} hrs).
+                          </div>
+                        </div>
+                      )}
+                      {hourlyStatus.status === "excess" && (
+                        <div className="mb-3 p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/50 rounded-lg flex items-center gap-2">
+                          <ShieldAlert className="w-4 h-4 text-blue-500 shrink-0" />
+                          <div className="text-[11px] leading-tight text-blue-700 dark:text-blue-300">
+                            Exceso de {Math.abs(hourlyStatus.deficit)} horas respecto a la jornada ({hourlyStatus.available} hrs).
+                          </div>
+                        </div>
+                      )}
+                      {hourlyStatus.status === "ok" && (
+                        <div className="mb-3 p-2 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50 rounded-lg flex items-center gap-2">
+                          <Check className="w-4 h-4 text-emerald-500 shrink-0" />
+                          <div className="text-[11px] leading-tight text-emerald-700 dark:text-emerald-300">
+                            Intensidad horaria correcta ({hourlyStatus.available} hrs).
                           </div>
                         </div>
                       )}
@@ -1204,6 +1286,16 @@ export function CoursesModule() {
                                 {hourlyStatus.status === "deficit" && (
                                   <div className="mt-1 flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 px-1.5 py-0.5 rounded border border-amber-200/50 dark:border-amber-800/50 w-fit">
                                     <ShieldAlert className="w-3 h-3" /> Faltan {hourlyStatus.deficit} horas
+                                  </div>
+                                )}
+                                {hourlyStatus.status === "excess" && (
+                                  <div className="mt-1 flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 rounded border border-blue-200/50 dark:border-blue-800/50 w-fit">
+                                    <ShieldAlert className="w-3 h-3" /> Exceso de {Math.abs(hourlyStatus.deficit)} hrs
+                                  </div>
+                                )}
+                                {hourlyStatus.status === "ok" && (
+                                  <div className="mt-1 flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded border border-emerald-200/50 dark:border-emerald-800/50 w-fit">
+                                    <Check className="w-3 h-3" /> Completo
                                   </div>
                                 )}
                               </div>
@@ -1524,6 +1616,196 @@ export function CoursesModule() {
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* 4. DEGREES TAB */}
+      {activeTab === "degrees" && (
+        <div className="flex flex-col md:flex-row gap-6 animate-fade-in">
+          {/* Left panel: Degrees List */}
+          <div className="w-full md:w-1/3 bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden h-fit">
+            <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50">
+              <h2 className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                <GraduationCap className="w-5 h-5 text-blue-500" />
+                Grados Académicos
+              </h2>
+            </div>
+            <div className="divide-y divide-slate-100 dark:divide-slate-800 max-h-[600px] overflow-y-auto">
+              {uniqueDegrees.map((deg) => {
+                if (!deg) return null;
+                const isSelected = selectedDegree === deg;
+                const status = calculateDegreeHourlyStatus(deg);
+                
+                return (
+                  <button
+                    key={deg}
+                    onClick={() => setSelectedDegree(deg)}
+                    className={`w-full text-left px-6 py-4 flex flex-col gap-2 transition-all ${
+                      isSelected 
+                        ? "bg-blue-50 dark:bg-blue-900/20 border-l-4 border-l-blue-500" 
+                        : "hover:bg-slate-50 dark:hover:bg-slate-800/50 border-l-4 border-l-transparent"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className={`font-semibold text-sm ${isSelected ? "text-blue-700 dark:text-blue-400" : "text-slate-700 dark:text-slate-300"}`}>
+                        Grado {deg}
+                      </span>
+                      <ChevronRight className={`w-4 h-4 ${isSelected ? "text-blue-500" : "text-slate-400"}`} />
+                    </div>
+                    
+                    {/* Status Badge */}
+                    <div className="w-full">
+                      {status.status === "ok" && (
+                        <div className="inline-flex items-center gap-1 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-[10px] px-2 py-0.5 rounded border border-emerald-200/50 dark:border-emerald-800/50">
+                          <Check className="w-3 h-3" /> Completo
+                        </div>
+                      )}
+                      {status.status === "deficit" && (
+                        <div className="inline-flex items-center gap-1 bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 text-[10px] px-2 py-0.5 rounded border border-amber-200/50 dark:border-amber-800/50">
+                          <ShieldAlert className="w-3 h-3" /> Faltan {status.deficit} hrs
+                        </div>
+                      )}
+                      {status.status === "excess" && (
+                        <div className="inline-flex items-center gap-1 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[10px] px-2 py-0.5 rounded border border-blue-200/50 dark:border-blue-800/50">
+                          <ShieldAlert className="w-3 h-3" /> Exceso {Math.abs(status.deficit)} hrs
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+              {uniqueDegrees.length === 0 && (
+                <div className="p-8 text-center text-slate-500 text-sm">
+                  No se encontraron grados. Verifica que los cursos tengan un grado asociado.
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Right panel: Subjects assignment */}
+          <div className="w-full md:w-2/3">
+            {selectedDegree ? (
+              <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+                <div className="px-6 py-5 border-b border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 flex flex-col sm:flex-row gap-4 justify-between">
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">
+                      Malla de Grado {selectedDegree}
+                    </h2>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                      Asigna o retira materias para todos los cursos de este grado.
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="p-6">
+                  {(() => {
+                    const status = calculateDegreeHourlyStatus(selectedDegree);
+                    return (
+                      <div className="mb-6">
+                        {status.status === "deficit" && (
+                          <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 rounded-xl flex items-center gap-3">
+                            <ShieldAlert className="w-5 h-5 text-amber-500" />
+                            <div className="text-sm text-amber-700 dark:text-amber-300">
+                              Faltan <strong>{status.deficit} bloques</strong> para cubrir la jornada de {status.available} bloques.
+                            </div>
+                          </div>
+                        )}
+                        {status.status === "excess" && (
+                          <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/50 rounded-xl flex items-center gap-3">
+                            <ShieldAlert className="w-5 h-5 text-blue-500" />
+                            <div className="text-sm text-blue-700 dark:text-blue-300">
+                              Hay un exceso de <strong>{Math.abs(status.deficit)} bloques</strong>. El límite es de {status.available} bloques.
+                            </div>
+                          </div>
+                        )}
+                        {status.status === "ok" && (
+                          <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50 rounded-xl flex items-center gap-3">
+                            <Check className="w-5 h-5 text-emerald-500" />
+                            <div className="text-sm text-emerald-700 dark:text-emerald-300">
+                              La intensidad horaria está perfectamente cubierta ({status.available} bloques).
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  <div className="space-y-4">
+                    {areas.map(area => {
+                      const areaSubjects = subjects.filter(s => s.area === area.id);
+                      if (areaSubjects.length === 0) return null;
+                      
+                      const coursesInDegree = courses.filter(c => c.degree === selectedDegree);
+                      
+                      return (
+                        <details key={area.id} className="group" open>
+                          <summary className="flex items-center gap-2 pb-2 cursor-pointer list-none outline-none border-b border-slate-100 dark:border-slate-800">
+                            <div className="flex items-center gap-2 flex-1 hover:bg-slate-50 dark:hover:bg-slate-800/40 p-1.5 -ml-1.5 rounded-lg transition-colors">
+                              <ChevronRight className="w-4 h-4 text-slate-400 group-open:rotate-90 transition-transform" />
+                              <Layers className="w-4 h-4 text-blue-500" />
+                              <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                                {area.name} <span className="text-xs font-normal text-slate-400 normal-case ml-2">({areaSubjects.length})</span>
+                              </h3>
+                            </div>
+                          </summary>
+                          <div className="pl-4 ml-[11px] mt-2 mb-4 border-l-2 border-slate-100 dark:border-slate-800 py-2 space-y-2">
+                            {areaSubjects.map((subj) => {
+                              const isAssigned = subj.courses?.some(cId => coursesInDegree.some(c => c.id === cId));
+                              return (
+                                <label
+                                  key={subj.id}
+                                  className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer ${
+                                    isAssigned 
+                                      ? "bg-blue-50/50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800/50" 
+                                      : "bg-white dark:bg-slate-850 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
+                                  }`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={!!isAssigned}
+                                    onChange={() => handleToggleSubjectForDegree(subj, selectedDegree)}
+                                    className="w-4 h-4 text-blue-600 bg-slate-100 border-slate-300 rounded focus:ring-blue-500"
+                                  />
+                                  <div className="flex-1 flex justify-between items-center">
+                                    <div>
+                                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">{subj.name}</div>
+                                      <div className="text-xs text-slate-500">{subj.description || "Sin descripción"}</div>
+                                    </div>
+                                    <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
+                                      <input
+                                        type="number"
+                                        min="1"
+                                        max="40"
+                                        value={subj.weekly_hours_overrides?.[selectedDegree] ?? subj.weekly_hours ?? 1}
+                                        onChange={(e) => {
+                                          const val = parseInt(e.target.value) || 1;
+                                          handleUpdateSubjectDegreeHours(subj, selectedDegree, val);
+                                        }}
+                                        className="w-14 text-center text-xs font-bold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-md py-1 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                      />
+                                      <span className="text-xs text-slate-500 font-medium">hrs</span>
+                                    </div>
+                                  </div>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </details>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-12 text-center flex flex-col items-center justify-center h-full">
+                <GraduationCap className="w-12 h-12 text-slate-300 dark:text-slate-600 mb-4" />
+                <h3 className="text-lg font-bold text-slate-700 dark:text-slate-300">Selecciona un grado</h3>
+                <p className="text-slate-500 text-sm max-w-sm mt-2">
+                  Elige un grado académico de la lista para gestionar de forma masiva las asignaturas y validar su intensidad horaria.
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

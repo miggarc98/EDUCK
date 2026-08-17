@@ -10,12 +10,15 @@ class TeacherProfile(models.Model):
     )
     employee_id = models.CharField(max_length=50, unique=True, blank=True)
     area = models.CharField(max_length=100, blank=True)
+    additional_areas = models.JSONField(default=list, blank=True, help_text="Áreas secundarias que puede dictar")
+    max_hours = models.PositiveIntegerField(default=22, help_text="Límite de horas semanales permitidas")
     academic_load = models.PositiveIntegerField(default=0)
     status = models.CharField(
         max_length=20,
         choices=[('active', 'Activo'), ('on_leave', 'En Licencia')],
         default='active'
     )
+    available_shifts = models.JSONField(default=list, blank=True, help_text="Jornadas disponibles (ej. ['Mañana', 'Tarde'])")
     availability = models.JSONField(default=dict, blank=True, help_text="Disponibilidad horaria por día")
 
     class Meta:

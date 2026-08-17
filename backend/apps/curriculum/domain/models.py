@@ -13,6 +13,7 @@ class Course(models.Model):
         related_name="directed_courses",
         help_text="Director de grupo"
     )
+    shift = models.CharField(max_length=50, blank=True, null=True, help_text="Jornada (ej. Mañana, Tarde)")
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -61,6 +62,11 @@ class Subject(models.Model):
     )
     is_active = models.BooleanField(default=True)
     weekly_hours = models.PositiveIntegerField(default=1, help_text="Intensidad horaria semanal máxima permitida por curso")
+    weekly_hours_overrides = models.JSONField(
+        default=dict, 
+        blank=True, 
+        help_text="Overrides de horas semanales por grado. Ej: {'10º': 2}"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
