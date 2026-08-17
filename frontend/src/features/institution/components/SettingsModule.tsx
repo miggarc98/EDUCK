@@ -19,7 +19,7 @@ import {
   INITIAL_LEVEL_GROUPS,
 } from "../constants/institutionDefaults";
 import { InstitutionGeneralTab } from "./tabs/InstitutionGeneralTab";
-import { AcademicConfigTab, BreakConfig } from "./tabs/AcademicConfigTab";
+import { AcademicConfigTab, BreakConfig, ShiftConfig } from "./tabs/AcademicConfigTab";
 import { RolesPermissionsTab } from "./tabs/RolesPermissionsTab";
 import { CurriculumSettingsTab } from "./tabs/CurriculumSettingsTab";
 import { PermissionEditModal } from "./modals/PermissionEditModal";
@@ -218,12 +218,11 @@ export function SettingsModule() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Academic Configuration
-  const [academicYear, setAcademicYear] = useState("2024");
+  const [academicYear, setAcademicYear] = useState("2026");
   const [currentPeriod, setCurrentPeriod] = useState("Segundo Periodo");
-  const [startTime, setStartTime] = useState("07:00");
-  const [endTime, setEndTime] = useState("15:00");
-  const [classDuration, setClassDuration] = useState("60 min");
+  const [classDuration, setClassDuration] = useState<number>(45);
   const [breaks, setBreaks] = useState<BreakConfig[]>([]);
+  const [shifts, setShifts] = useState<ShiftConfig[]>([]);
 
   // Grading System Configuration
   const [generalScale, setGeneralScale] = useState<"numeric_1_5" | "numeric_0_100" | "qualitative" | "national_col">("numeric_1_5");
@@ -251,13 +250,14 @@ export function SettingsModule() {
         if (data.logo) setLogoPreview(data.logo);
         if (data.is_formal_education !== undefined) setIsFormalEducation(data.is_formal_education);
 
+        if (data.academic_year !== undefined) setAcademicYear(data.academic_year.toString());
+        if (data.block_duration_minutes !== undefined) setClassDuration(data.block_duration_minutes);
+
         if (data.settings_json?.academic) {
           const ac = data.settings_json.academic;
-          if (ac.academic_year) setAcademicYear(ac.academic_year);
+          if (ac.academic_year && !data.academic_year) setAcademicYear(ac.academic_year.toString());
           if (ac.current_period) setCurrentPeriod(ac.current_period);
-          if (ac.start_time) setStartTime(ac.start_time);
-          if (ac.end_time) setEndTime(ac.end_time);
-          if (ac.class_duration) setClassDuration(ac.class_duration);
+          if (ac.class_duration && !data.block_duration_minutes) setClassDuration(Number(ac.class_duration));
         }
 
         if (data.settings_json?.grading) {
@@ -287,6 +287,12 @@ export function SettingsModule() {
           setBreaks(data.settings_json.breaks);
         } else {
           setBreaks([]);
+        }
+
+        if (data.shifts && Array.isArray(data.shifts)) {
+          setShifts(data.shifts);
+        } else {
+          setShifts([]);
         }
       }
     } catch (err) {
@@ -382,12 +388,13 @@ export function SettingsModule() {
         phone: phone,
         email: email,
         is_formal_education: isFormalEducation,
+        academic_year: academicYear,
+        block_duration_minutes: classDuration,
+        shifts: shifts,
         settings_json: {
           academic: {
             academic_year: academicYear,
             current_period: currentPeriod,
-            start_time: startTime,
-            end_time: endTime,
             class_duration: classDuration,
           },
           grading: {
@@ -533,10 +540,6 @@ export function SettingsModule() {
           setAcademicYear={setAcademicYear}
           currentPeriod={currentPeriod}
           setCurrentPeriod={setCurrentPeriod}
-          startTime={startTime}
-          setStartTime={setStartTime}
-          endTime={endTime}
-          setEndTime={setEndTime}
           classDuration={classDuration}
           setClassDuration={setClassDuration}
           generalScale={generalScale}
@@ -553,6 +556,8 @@ export function SettingsModule() {
           isFormalEducation={isFormalEducation}
           breaks={breaks}
           setBreaks={setBreaks}
+          shifts={shifts}
+          setShifts={setShifts}
           courses={courses}
         />
       )}

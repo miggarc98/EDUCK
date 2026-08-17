@@ -1,7 +1,9 @@
 from django.db import models
 from django.conf import settings
 
-class Course(models.Model):
+from apps.core.domain.models import TimeStampedModel
+
+class Course(TimeStampedModel):
     name = models.CharField(max_length=100, help_text="Nombre del curso/grupo (ej: Grado 6A, Sexto uno)")
     level = models.CharField(max_length=100, help_text="Nivel académico (ej: Básica Secundaria, Media Académica)")
     degree = models.CharField(max_length=50, blank=True, null=True, help_text="Grado académico (ej: 6º, 7º)")
@@ -23,8 +25,6 @@ class Course(models.Model):
     )
     shift = models.CharField(max_length=50, blank=True, null=True, help_text="Jornada (ej. Mañana, Tarde)")
     is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = 'curriculum_courses'
@@ -35,13 +35,11 @@ class Course(models.Model):
         return self.name
 
 
-class Area(models.Model):
+class Area(TimeStampedModel):
     name = models.CharField(max_length=100, unique=True, help_text="Nombre del área (ej: Ciencias Naturales, Matemáticas)")
     description = models.TextField(blank=True, null=True, help_text="Descripción del área")
     is_mandatory = models.BooleanField(default=False, help_text="Indica si es un área obligatoria Ley 115")
     is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
 
     class Meta:
@@ -53,7 +51,7 @@ class Area(models.Model):
         return self.name
 
 
-class Subject(models.Model):
+class Subject(TimeStampedModel):
     name = models.CharField(max_length=100, help_text="Nombre de la asignatura (ej: Biología, Física, Química)")
     description = models.TextField(blank=True, null=True, help_text="Descripción de la asignatura")
     area = models.ForeignKey(
@@ -75,8 +73,6 @@ class Subject(models.Model):
         blank=True, 
         help_text="Overrides de horas semanales por grado. Ej: {'10º': 2}"
     )
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = 'curriculum_subjects'

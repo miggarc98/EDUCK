@@ -25,7 +25,9 @@ def default_settings_json():
         }
     }
 
-class InstitutionSetting(models.Model):
+from apps.core.domain.models import TimeStampedModel
+
+class InstitutionSetting(TimeStampedModel):
     """
     Modelo de configuración privada de la institución educativa para el tenant activo.
     Mantiene una única instancia (Singleton) por esquema/tenant.
@@ -40,7 +42,7 @@ class InstitutionSetting(models.Model):
 
 
     # Configuración académica
-    academic_year = models.IntegerField(default=2024)
+    academic_year = models.CharField(max_length=20, default='2026')
     active_period = models.CharField(max_length=50, default='1er Periodo')
     start_time = models.CharField(max_length=10, default='07:00')
     end_time = models.CharField(max_length=10, default='14:30')
@@ -64,9 +66,6 @@ class InstitutionSetting(models.Model):
 
     # Configuración extendida en formato JSON para máxima flexibilidad
     settings_json = models.JSONField(default=default_settings_json, blank=True)
-
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = 'institution_settings'

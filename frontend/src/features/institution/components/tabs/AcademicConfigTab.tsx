@@ -3,11 +3,19 @@ import { Calendar, Award, Layers, Check, X, Clock, Plus, Trash2 } from "lucide-r
 import type { LevelGroup } from "../../constants/institutionDefaults";
 import type { Course } from "@/features/curriculum/types";
 
+export interface ShiftConfig {
+  id: string;
+  name: string;
+  start_time: string;
+  end_time: string;
+}
+
 export interface BreakConfig {
   name: string;
   start_time: string;
   end_time: string;
   courses: number[];
+  shift_id?: string;
 }
 
 interface AcademicConfigTabProps {
@@ -15,12 +23,9 @@ interface AcademicConfigTabProps {
   setAcademicYear: (val: string) => void;
   currentPeriod: string;
   setCurrentPeriod: (val: string) => void;
-  startTime: string;
-  setStartTime: (val: string) => void;
-  endTime: string;
-  setEndTime: (val: string) => void;
-  classDuration: string;
-  setClassDuration: (val: string) => void;
+
+  classDuration: number;
+  setClassDuration: (val: number) => void;
   generalScale: "numeric_1_5" | "numeric_0_100" | "qualitative" | "national_col";
   setGeneralScale: (val: "numeric_1_5" | "numeric_0_100" | "qualitative" | "national_col") => void;
   decimalPrecision: "1" | "2";
@@ -36,6 +41,8 @@ interface AcademicConfigTabProps {
   breaks: BreakConfig[];
   setBreaks: React.Dispatch<React.SetStateAction<BreakConfig[]>>;
   courses: Course[];
+  shifts: ShiftConfig[];
+  setShifts: React.Dispatch<React.SetStateAction<ShiftConfig[]>>;
 }
 
 export function AcademicConfigTab({
@@ -43,10 +50,7 @@ export function AcademicConfigTab({
   setAcademicYear,
   currentPeriod,
   setCurrentPeriod,
-  startTime,
-  setStartTime,
-  endTime,
-  setEndTime,
+
   classDuration,
   setClassDuration,
   generalScale,
@@ -64,7 +68,25 @@ export function AcademicConfigTab({
   breaks,
   setBreaks,
   courses,
+  shifts,
+  setShifts,
 }: AcademicConfigTabProps) {
+  const handleAddShift = () => {
+    setShifts((prev) => [
+      ...prev,
+      { id: `jornada_${prev.length + 1}`, name: `Jornada ${prev.length + 1}`, start_time: "07:00", end_time: "13:00" }
+    ]);
+  };
+
+  const handleRemoveShift = (idx: number) => {
+    setShifts((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleUpdateShift = (idx: number, key: string, val: string) => {
+    setShifts((prev) =>
+      prev.map((s, i) => (i === idx ? { ...s, [key]: val } : s))
+    );
+  };
   const handleAddBreak = () => {
     setBreaks((prev) => [
       ...prev,
@@ -143,20 +165,18 @@ export function AcademicConfigTab({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
               Año Lectivo Activo
             </label>
-            <select
+            <input
+              type="text"
               value={academicYear}
               onChange={(e) => setAcademicYear(e.target.value)}
+              placeholder="Ej: 2026, 2026-1"
               className="w-full px-3.5 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-800 dark:text-slate-100"
-            >
-              <option value="2023">2023</option>
-              <option value="2024">2024 (En curso)</option>
-              <option value="2025">2025 (Planeación)</option>
-            </select>
+            />
           </div>
 
           <div>
@@ -177,39 +197,85 @@ export function AcademicConfigTab({
 
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-              Horario de Inicio / Fin Sede
+              Duración Bloque de Clase (Minutos)
             </label>
-            <div className="flex items-center gap-2">
-              <input
-                type="time"
-                value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-                className="w-full px-2.5 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-800 dark:text-slate-100"
-              />
-              <span className="text-slate-400 text-xs">-</span>
-              <input
-                type="time"
-                value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
-                className="w-full px-2.5 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-800 dark:text-slate-100"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-              Duración Bloque de Clase
-            </label>
-            <select
+            <input
+              type="number"
+              min="1"
+              max="240"
               value={classDuration}
-              onChange={(e) => setClassDuration(e.target.value)}
+              onChange={(e) => setClassDuration(Number(e.target.value))}
+              placeholder="Ej: 45"
               className="w-full px-3.5 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-800 dark:text-slate-100"
-            >
-              <option value="45 min">45 minutos</option>
-              <option value="50 min">50 minutos</option>
-              <option value="55 min">55 minutos</option>
-              <option value="60 min">60 minutos (1 hora)</option>
-            </select>
+            />
+          </div>
+          
+          {/* Jornadas / Shifts */}
+          <div className="col-span-1 sm:col-span-2 md:col-span-4 mt-4">
+            <div className="flex items-center justify-between mb-3">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                Jornadas Educativas (Turnos)
+              </label>
+              <button
+                type="button"
+                onClick={handleAddShift}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg text-xs font-bold hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Agregar Jornada
+              </button>
+            </div>
+            {shifts.length === 0 && (
+              <p className="text-xs text-slate-500 italic">No hay jornadas configuradas. Utilice los horarios de inicio/fin de la sede.</p>
+            )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {shifts.map((shift, idx) => (
+                <div key={idx} className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <input
+                      type="text"
+                      value={shift.name}
+                      onChange={(e) => handleUpdateShift(idx, "name", e.target.value)}
+                      className="bg-transparent font-bold text-sm text-slate-800 dark:text-slate-100 border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none transition-colors w-full mr-2"
+                      placeholder="Ej. Mañana"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveShift(idx)}
+                      className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-xs font-medium text-slate-500 w-12">ID:</span>
+                    <input
+                      type="text"
+                      value={shift.id}
+                      onChange={(e) => handleUpdateShift(idx, "id", e.target.value.toLowerCase().replace(/\s+/g, "_"))}
+                      className="w-full px-2 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                      placeholder="Identificador único (ej. manana)"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-slate-500 w-12">Horario:</span>
+                    <input
+                      type="time"
+                      value={shift.start_time}
+                      onChange={(e) => handleUpdateShift(idx, "start_time", e.target.value)}
+                      className="w-full px-2 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    />
+                    <span className="text-slate-400 text-xs">-</span>
+                    <input
+                      type="time"
+                      value={shift.end_time}
+                      onChange={(e) => handleUpdateShift(idx, "end_time", e.target.value)}
+                      className="w-full px-2 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </section>
@@ -503,7 +569,7 @@ export function AcademicConfigTab({
                   <Trash2 className="w-4 h-4" />
                 </button>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pr-10">
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 pr-10">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                       Nombre del Descanso
@@ -515,6 +581,21 @@ export function AcademicConfigTab({
                       placeholder="ej: Descanso Primaria"
                       className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-800 dark:text-slate-100"
                     />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      Jornada (Opcional)
+                    </label>
+                    <select
+                      value={br.shift_id || ""}
+                      onChange={(e) => handleUpdateBreak(index, "shift_id", e.target.value)}
+                      className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-800 dark:text-slate-100"
+                    >
+                      <option value="">Ninguna</option>
+                      {shifts.map((s) => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">

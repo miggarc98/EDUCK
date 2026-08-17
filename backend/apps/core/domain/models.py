@@ -50,3 +50,14 @@ class AuditLog(models.Model):
 
     def delete(self, *args, **kwargs):
         raise ValidationError("Los registros de auditoría e historial son inmutables y no se pueden eliminar.")
+
+class TimeStampedModel(models.Model):
+    """
+    Modelo base abstracto que provee los campos created_at y updated_at.
+    Ayuda a mantener el principio DRY a través de la aplicación.
+    """
+    created_at = models.DateTimeField(auto_now_add=True, help_text="Fecha y hora de creación")
+    updated_at = models.DateTimeField(auto_now=True, help_text="Fecha y hora de la última actualización")
+
+    class Meta:
+        abstract = True

@@ -32,7 +32,7 @@ export interface InstitutionSettingData {
   logo_url: string;
   is_formal_education?: boolean;
 
-  academic_year: number;
+  academic_year: string;
   active_period: string;
   start_time: string;
   end_time: string;

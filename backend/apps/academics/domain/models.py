@@ -39,7 +39,9 @@ class TeacherProfile(models.Model):
             self.employee_id = f"DOC-{max_id + 1:03d}"
         super().save(*args, **kwargs)
 
-class ClassSchedule(models.Model):
+from apps.core.domain.models import TimeStampedModel
+
+class ClassSchedule(TimeStampedModel):
     course = models.ForeignKey(
         'curriculum.Course',
         on_delete=models.CASCADE,
@@ -73,9 +75,6 @@ class ClassSchedule(models.Model):
     )
     room = models.CharField(max_length=100, blank=True, default='', help_text="Lugar/Aula (ej: Aula 101)")
 
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
     class Meta:
         db_table = 'academics_class_schedules'
         verbose_name = 'Horario de Clase'
@@ -85,3 +84,34 @@ class ClassSchedule(models.Model):
     def __str__(self):
         return f"{self.course} - {self.day} {self.time_slot}: {self.subject} ({self.room})"
 
+
+class TeacherAcademicHistory(models.Model):
+    teacher = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='teacher_academic_history'
+    )
+    year = models.CharField(max_length=20, help_text="Año o ciclo lectivo (ej: 2026, 2026-1)")
+    course = models.ForeignKey(
+        'curriculum.Course',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_constraint=False
+    )
+    subject = models.ForeignKey(
+        'curriculum.Subject',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_constraint=False
+    )
+
+    class Meta:
+        db_table = 'academics_teacher_academic_history'
+        verbose_name = 'Historial Académico Docente'
+        verbose_name_plural = 'Historiales Académicos Docentes'
+        ordering = ['-year']
+
+    def __str__(self):
+        return f"{self.teacher.email} - {self.subject} en {self.course} ({self.year})"

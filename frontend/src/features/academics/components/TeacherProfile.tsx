@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { ArrowLeft, User, Mail, BookOpen, Briefcase, Trash2, Edit2, Save, X, Clock } from 'lucide-react';
 import type { Teacher } from '../types';
 import { academicsApi } from '../services/api';
+import { Button } from '../../../shared/components/atoms/Button';
+import { Input } from '../../../shared/components/atoms/Input';
+
 
 import type { Area, Course } from '../../curriculum/types';
 import type { InstitutionSettingData } from '../../institution/types';
@@ -80,51 +83,33 @@ export function TeacherProfile({ teacher, onBack, onUpdate, onDelete, areasList,
     <div className="absolute inset-0 bg-slate-50 dark:bg-slate-950 z-30 flex flex-col animate-in fade-in slide-in-from-right duration-200">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-4 mb-6">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-2 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 text-sm font-medium transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
+        <Button variant="ghost" size="sm" onClick={onBack} className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">
+          <ArrowLeft className="w-4 h-4 mr-2" />
           Volver a la planta docente
-        </button>
+        </Button>
 
         <div className="flex gap-2">
           {isEditing ? (
             <>
-              <button
-                onClick={() => setIsEditing(false)}
-                disabled={isSaving}
-                className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900 rounded-lg text-xs font-medium transition-colors"
-              >
-                <X className="w-3.5 h-3.5" />
+              <Button variant="outline" size="sm" onClick={() => setIsEditing(false)} disabled={isSaving}>
+                <X className="w-4 h-4 mr-1.5" />
                 Cancelar
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={isSaving}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-medium transition-colors shadow-sm disabled:opacity-50"
-              >
-                <Save className="w-3.5 h-3.5" />
-                {isSaving ? 'Guardando...' : 'Guardar'}
-              </button>
+              </Button>
+              <Button variant="default" size="sm" onClick={handleSave} loading={isSaving} className="bg-emerald-600 hover:bg-emerald-700">
+                <Save className="w-4 h-4 mr-1.5" />
+                Guardar
+              </Button>
             </>
           ) : (
             <>
-              <button
-                onClick={() => setIsEditing(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900 rounded-lg text-xs font-medium transition-colors"
-              >
-                <Edit2 className="w-3.5 h-3.5 text-slate-500" />
+              <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
+                <Edit2 className="w-4 h-4 mr-1.5 text-slate-500" />
                 Editar Perfil
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={isDeleting}
-                className="flex items-center gap-1.5 px-3 py-1.5 border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg text-xs font-medium transition-colors"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                {isDeleting ? 'Eliminando...' : 'Eliminar'}
-              </button>
+              </Button>
+              <Button variant="destructive" size="sm" onClick={handleDelete} loading={isDeleting}>
+                <Trash2 className="w-4 h-4 mr-1.5" />
+                Eliminar
+              </Button>
             </>
           )}
         </div>
@@ -146,20 +131,8 @@ export function TeacherProfile({ teacher, onBack, onUpdate, onDelete, areasList,
           <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100">
             {isEditing ? (
               <div className="flex gap-2 mb-2">
-                <input
-                  type="text"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  className="w-full px-2 py-1 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                  placeholder="Nombres"
-                />
-                <input
-                  type="text"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  className="w-full px-2 py-1 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                  placeholder="Apellidos"
-                />
+                <Input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Nombres" className="dark:bg-slate-800" />
+                <Input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Apellidos" className="dark:bg-slate-800" />
               </div>
             ) : (
               `${teacher.first_name} ${teacher.last_name}`
@@ -175,12 +148,7 @@ export function TeacherProfile({ teacher, onBack, onUpdate, onDelete, areasList,
             <div className="flex items-center gap-3 text-slate-600 dark:text-slate-350">
               <Mail className="w-4 h-4 text-slate-400 shrink-0" />
               {isEditing ? (
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-2 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md focus:outline-none focus:ring-1 focus:ring-emerald-500 text-xs"
-                />
+                <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="dark:bg-slate-800 h-8 text-xs" />
               ) : (
                 <span className="truncate" title={teacher.email}>{teacher.email}</span>
               )}
@@ -192,12 +160,7 @@ export function TeacherProfile({ teacher, onBack, onUpdate, onDelete, areasList,
             <div className="flex items-center gap-3 text-slate-600 dark:text-slate-350">
               <Briefcase className="w-4 h-4 text-slate-400 shrink-0" />
               <span>Carga: {isEditing ? (
-                <input
-                  type="number"
-                  value={load}
-                  onChange={(e) => setLoad(Number(e.target.value))}
-                  className="w-16 px-2 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md focus:outline-none focus:ring-1 focus:ring-emerald-500 text-xs"
-                />
+                <Input type="number" value={load} onChange={(e) => setLoad(Number(e.target.value))} className="w-20 dark:bg-slate-800 h-8 text-xs" />
               ) : teacher.load} hrs/sem</span>
             </div>
           </div>
@@ -218,13 +181,7 @@ export function TeacherProfile({ teacher, onBack, onUpdate, onDelete, areasList,
                   Área / Especialidad
                 </label>
                 {isEditing ? (
-                  <input
-                    type="text"
-                    value={area}
-                    onChange={(e) => setArea(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm transition-all"
-                    placeholder="Ej: Matemáticas, Ciencias..."
-                  />
+                  <Input type="text" value={area} onChange={(e) => setArea(e.target.value)} placeholder="Ej: Matemáticas, Ciencias..." className="dark:bg-slate-800" />
                 ) : (
                   <span className="inline-block px-3 py-1.5 text-sm font-semibold text-slate-800 dark:text-slate-250 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg">
                     {teacher.area || 'Sin especificar'}
@@ -374,14 +331,7 @@ export function TeacherProfile({ teacher, onBack, onUpdate, onDelete, areasList,
                   Límite Máximo de Horas/Semana
                 </label>
                 {isEditing ? (
-                  <input
-                    type="number"
-                    value={maxHours}
-                    onChange={(e) => setMaxHours(Number(e.target.value))}
-                    min={1}
-                    max={50}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm transition-all"
-                  />
+                  <Input type="number" value={maxHours} onChange={(e) => setMaxHours(Number(e.target.value))} min={1} max={50} className="dark:bg-slate-800" />
                 ) : (
                   <span className="inline-block px-3 py-1.5 text-sm font-bold text-slate-800 dark:text-slate-250 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg">
                     {teacher.max_hours || settings?.default_teacher_max_hours || 22} hrs
