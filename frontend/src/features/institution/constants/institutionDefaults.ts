@@ -13,11 +13,25 @@ export interface CycleItem {
   grados: GradeItem[];
 }
 
+export interface LevelEquivalence {
+  label?: string;
+  description?: string;
+  min?: number;
+  max?: number;
+}
+
 export interface LevelGroup {
   levelId: string;
   levelName: string;
   description: string;
   gradingScale: string;
+  minPassingGrade?: string | number;
+  equivalences?: {
+    excelente: LevelEquivalence;
+    sobresaliente: LevelEquivalence;
+    aprobado: LevelEquivalence;
+    reprobado: LevelEquivalence;
+  };
   ciclos?: CycleItem[];
   grades: GradeItem[];
 }
@@ -195,5 +209,17 @@ export const INITIAL_LEVEL_GROUPS: LevelGroup[] = ley115Data.map((lvl) => {
     gradingScale: scaleMap[lvl.nivel] || "numeric_1_5",
     ciclos: ciclosParsed,
     grades: allGrades,
+    minPassingGrade: lvl.nivel === "Educación Preescolar" ? "A" : 3.0,
+    equivalences: lvl.nivel === "Educación Preescolar" ? {
+      excelente: { label: "E", description: "Excelente" },
+      sobresaliente: { label: "S", description: "Sobresaliente" },
+      aprobado: { label: "A", description: "Aceptable" },
+      reprobado: { label: "I", description: "Insuficiente" }
+    } : {
+      excelente: { min: 4.6, max: 5.0 },
+      sobresaliente: { min: 4.0, max: 4.5 },
+      aprobado: { min: 3.0, max: 3.9 },
+      reprobado: { min: 1.0, max: 2.9 }
+    },
   };
 });

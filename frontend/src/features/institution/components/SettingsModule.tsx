@@ -331,12 +331,59 @@ export function SettingsModule() {
 
   const changeLevelGradingScale = (levelId: string, scale: string) => {
     setLevelGroups((prev) =>
+      prev.map((group) => {
+        if (group.levelId !== levelId) return group;
+        
+        // Asignar valores por defecto según la escala seleccionada
+        const isNumeric = scale.includes('numeric');
+        const defaultMin = isNumeric ? 3.0 : 'A';
+        const defaultEq = isNumeric ? {
+          excelente: { min: 4.6, max: 5.0 },
+          sobresaliente: { min: 4.0, max: 4.5 },
+          aprobado: { min: 3.0, max: 3.9 },
+          reprobado: { min: 1.0, max: 2.9 }
+        } : {
+          excelente: { label: "E", description: "Excelente" },
+          sobresaliente: { label: "S", description: "Sobresaliente" },
+          aprobado: { label: "A", description: "Aceptable" },
+          reprobado: { label: "I", description: "Insuficiente" }
+        };
+
+        return { 
+          ...group, 
+          gradingScale: scale,
+          minPassingGrade: defaultMin,
+          equivalences: defaultEq
+        };
+      })
+    );
+  };
+
+  const updateLevelScaleField = (levelId: string, field: string, value: any) => {
+    setLevelGroups((prev) =>
       prev.map((group) =>
-        group.levelId === levelId ? { ...group, gradingScale: scale } : group
+        group.levelId === levelId ? { ...group, [field]: value } : group
       )
     );
   };
 
+  const updateLevelEquivalence = (levelId: string, gradeLevel: string, field: string, value: any) => {
+    setLevelGroups((prev) =>
+      prev.map((group) => {
+        if (group.levelId !== levelId || !group.equivalences) return group;
+        return {
+          ...group,
+          equivalences: {
+            ...group.equivalences,
+            [gradeLevel]: {
+              ...(group.equivalences as any)[gradeLevel],
+              [field]: value
+            }
+          }
+        };
+      })
+    );
+  };
   const togglePermission = (roleId: string, permName: string) => {
     if (roleId === "admin") return;
     setRoles((prevRoles) =>
@@ -408,6 +455,7 @@ export function SettingsModule() {
           breaks: breaks,
         },
       };
+
 
       await institutionApi.updateSettings(payload);
       setSaveSuccessMessage("Configuración general guardada exitosamente.");
@@ -552,6 +600,8 @@ export function SettingsModule() {
           setIndependentScaleByCourse={setIndependentScaleByCourse}
           levelGroups={levelGroups}
           changeLevelGradingScale={changeLevelGradingScale}
+          updateLevelScaleField={updateLevelScaleField}
+          updateLevelEquivalence={updateLevelEquivalence}
           toggleGrade={toggleGrade}
           isFormalEducation={isFormalEducation}
           breaks={breaks}

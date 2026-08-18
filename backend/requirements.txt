@@ -18,4 +18,8 @@ factory-boy
 pyotp
 qrcode
 debugpy>=1.8.0
-
+django-encrypted-model-fields
+django-auditlog
+django-axes
+django-csp
+django-two-factor-auth

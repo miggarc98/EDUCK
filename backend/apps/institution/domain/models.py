@@ -2,10 +2,46 @@ from django.db import models
 
 def default_level_scales():
     return {
-        "preescolar": "Cualitativa (E / S / A / I)",
-        "primaria": "1.0 - 5.0 (Numérica)",
-        "secundaria": "1.0 - 5.0 (Numérica)",
-        "media": "1.0 - 5.0 (Numérica)"
+        "preescolar": {
+            "type": "Cualitativa (E / S / A / I)",
+            "min_passing_grade": "A",
+            "equivalences": {
+                "excelente": {"label": "E", "description": "Excelente"},
+                "sobresaliente": {"label": "S", "description": "Sobresaliente"},
+                "aprobado": {"label": "A", "description": "Aceptable"},
+                "reprobado": {"label": "I", "description": "Insuficiente"}
+            }
+        },
+        "primaria": {
+            "type": "1.0 - 5.0 (Numérica)",
+            "min_passing_grade": 3.0,
+            "equivalences": {
+                "excelente": {"min": 4.6, "max": 5.0},
+                "sobresaliente": {"min": 4.0, "max": 4.5},
+                "aprobado": {"min": 3.0, "max": 3.9},
+                "reprobado": {"min": 1.0, "max": 2.9}
+            }
+        },
+        "secundaria": {
+            "type": "1.0 - 5.0 (Numérica)",
+            "min_passing_grade": 3.0,
+            "equivalences": {
+                "excelente": {"min": 4.6, "max": 5.0},
+                "sobresaliente": {"min": 4.0, "max": 4.5},
+                "aprobado": {"min": 3.0, "max": 3.9},
+                "reprobado": {"min": 1.0, "max": 2.9}
+            }
+        },
+        "media": {
+            "type": "1.0 - 5.0 (Numérica)",
+            "min_passing_grade": 3.0,
+            "equivalences": {
+                "excelente": {"min": 4.6, "max": 5.0},
+                "sobresaliente": {"min": 4.0, "max": 4.5},
+                "aprobado": {"min": 3.0, "max": 3.9},
+                "reprobado": {"min": 1.0, "max": 2.9}
+            }
+        }
     }
 
 def default_offered_degrees():

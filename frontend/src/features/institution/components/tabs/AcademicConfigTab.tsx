@@ -36,6 +36,8 @@ interface AcademicConfigTabProps {
   setIndependentScaleByCourse: (val: boolean) => void;
   levelGroups: LevelGroup[];
   changeLevelGradingScale: (levelId: string, scale: string) => void;
+  updateLevelScaleField: (levelId: string, field: string, value: any) => void;
+  updateLevelEquivalence: (levelId: string, gradeLevel: string, field: string, value: any) => void;
   toggleGrade: (levelId: string, gradeId: string) => void;
   isFormalEducation: boolean;
   breaks: BreakConfig[];
@@ -63,6 +65,8 @@ export function AcademicConfigTab({
   setIndependentScaleByCourse,
   levelGroups,
   changeLevelGradingScale,
+  updateLevelScaleField,
+  updateLevelEquivalence,
   toggleGrade,
   isFormalEducation,
   breaks,
@@ -397,6 +401,59 @@ export function AcademicConfigTab({
                       <option value="qualitative">Cualitativa (E, S, A, I)</option>
                       <option value="national_col">Desempeño Nacional Colombia</option>
                     </select>
+
+                    <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-700/50">
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Nota Mínima de Aprobación</label>
+                      <input 
+                        type="text" 
+                        value={group.minPassingGrade || ""} 
+                        onChange={(e) => updateLevelScaleField(group.levelId, 'minPassingGrade', e.target.value)}
+                        className="w-full px-2 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-medium focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+                    
+                    {group.equivalences && (
+                      <div className="mt-2 space-y-2">
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Equivalencias de Desempeño</p>
+                        {['excelente', 'sobresaliente', 'aprobado', 'reprobado'].map((level) => {
+                          const eq = (group.equivalences as any)[level];
+                          const isNum = group.gradingScale.includes('numeric');
+                          return (
+                            <div key={level} className="flex items-center gap-2 text-[10px]">
+                              <span className="w-20 font-semibold capitalize text-slate-700 dark:text-slate-300">{level}:</span>
+                              {isNum ? (
+                                <>
+                                  <input 
+                                    type="number" step="0.1" placeholder="Min" value={eq.min || ""}
+                                    onChange={(e) => updateLevelEquivalence(group.levelId, level, 'min', parseFloat(e.target.value))}
+                                    className="w-14 px-1 py-1 rounded bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-center"
+                                  />
+                                  <span className="text-slate-400">-</span>
+                                  <input 
+                                    type="number" step="0.1" placeholder="Max" value={eq.max || ""}
+                                    onChange={(e) => updateLevelEquivalence(group.levelId, level, 'max', parseFloat(e.target.value))}
+                                    className="w-14 px-1 py-1 rounded bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-center"
+                                  />
+                                </>
+                              ) : (
+                                <>
+                                  <input 
+                                    type="text" placeholder="Abrev" value={eq.label || ""}
+                                    onChange={(e) => updateLevelEquivalence(group.levelId, level, 'label', e.target.value)}
+                                    className="w-12 px-1 py-1 rounded bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-center"
+                                  />
+                                  <input 
+                                    type="text" placeholder="Descripción" value={eq.description || ""}
+                                    onChange={(e) => updateLevelEquivalence(group.levelId, level, 'description', e.target.value)}
+                                    className="flex-1 px-1 py-1 rounded bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700"
+                                  />
+                                </>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
