@@ -9,5 +9,8 @@ urlpatterns = [
     path('api/enrollment/', include('apps.enrollment.api.urls')),
     path('api/core/', include('apps.core.api.urls')),
     path('api/academics/', include('apps.academics.api.urls')),
+    path('api/behavior/', include('apps.behavior.api.urls')),
+    path('api/communications/', include('apps.communications.api.urls')),
+    path('api/analytics/', include('apps.analytics.api.urls')),
 ]
 
