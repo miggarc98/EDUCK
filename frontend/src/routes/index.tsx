@@ -9,14 +9,8 @@ import { SettingsPage } from '@/features/institution';
 import { CoursesModule } from '@/features/curriculum';
 import { StudentsDirectory } from '@/features/enrollment';
 import { TeachersModule, ScheduleModule } from '@/features/academics';
+import DashboardView from '@/features/analytics/DashboardView';
 
-// Componente temporal para dashboard
-const DashboardPage = () => (
-    <div className="p-8">
-        <h1 className="text-2xl font-bold">Dashboard</h1>
-        <p className="mt-4">Bienvenido a Educk</p>
-    </div>
-);
 
 export const router = createBrowserRouter([
     {
@@ -39,7 +33,7 @@ export const router = createBrowserRouter([
         children: [
             {
                 path: 'dashboard',
-                element: <DashboardPage />,
+                element: <DashboardView />,
             },
             {
                 path: 'users',

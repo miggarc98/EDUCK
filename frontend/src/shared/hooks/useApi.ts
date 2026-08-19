@@ -33,7 +33,6 @@ export function useApi<T = any>() {
 }
 
 // shared/hooks/useToast.ts
-import { useState, useCallback } from 'react';
 
 export type ToastType = 'success' | 'error' | 'warning' | 'info';
 
